@@ -127,9 +127,10 @@ select {
   border: 1px solid var(--border-color);
 }
 
-.btn:hover {
+/* .btn:hover {
   background-color: var(--btn-hover);
-}
+  color: white;
+} */
 
 .btn.primary:hover {
   opacity: 0.9;
