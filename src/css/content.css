@@ -1,0 +1,37 @@
+/* JSON格式化大师内容样式 */
+.json-master-container {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+/* 高亮JSON语法 */
+.json-key {
+  color: #a6e22e;
+}
+
+.json-string {
+  color: #e6db74;
+}
+
+.json-number {
+  color: #ae81ff;
+}
+
+.json-boolean {
+  color: #f92672;
+}
+
+.json-null {
+  color: #fd971f;
+}
+
+/* 格式化后的JSON容器 */
+.json-formatted {
+  background-color: #272822;
+  color: #f8f8f2;
+  padding: 16px;
+  border-radius: 4px;
+  overflow: auto;
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 14px;
+  line-height: 1.5;
+}

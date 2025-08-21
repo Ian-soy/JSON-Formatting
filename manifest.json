@@ -1,0 +1,44 @@
+{
+  "manifest_version": 3,
+  "name": "JSON格式化大师",
+  "version": "1.0.0",
+  "description": "一款功能强大的JSON格式化工具，支持格式化、压缩、错误修复、主题切换等功能",
+  "icons": {
+    "16": "src/images/icon16.png",
+    "48": "src/images/icon48.png",
+    "128": "src/images/icon128.png"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "src/images/icon16.png",
+      "48": "src/images/icon48.png",
+      "128": "src/images/icon128.png"
+    }
+  },
+  "permissions": [
+    "activeTab",
+    "storage",
+    "clipboardWrite",
+    "scripting"
+  ],
+  "host_permissions": [
+    "http://localhost/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["src/js/content.js"],
+      "css": ["src/css/content.css"]
+    }
+  ],
+  "background": {
+    "service_worker": "src/js/background.js"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["src/css/*", "src/js/*", "src/images/*"],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}
