@@ -6,6 +6,7 @@ let currentJsonData = {};
 // 监听来自popup的消息
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'startApiServer') {
+    debugger;
     startApiServer(request.data, sendResponse);
     return true; // 保持消息通道开放，以便异步响应
   } else if (request.action === 'stopApiServer') {
@@ -75,84 +76,84 @@ function createPythonApiServer() {
   return new Promise((resolve, reject) => {
     // 使用chrome.downloads API下载Python文件
     const pythonCode = `
-import json
-import uvicorn
-import threading
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-from typing import Dict, Any
+      import json
+      import uvicorn
+      import threading
+      from fastapi import FastAPI, HTTPException
+      from fastapi.middleware.cors import CORSMiddleware
+      from pydantic import BaseModel
+      from typing import Dict, Any
 
-# 创建FastAPI应用
-app = FastAPI(
-    title="JSON Master API",
-    description="由JSON格式化大师提供的API服务",
-    version="1.0.0"
-)
+      # 创建FastAPI应用
+      app = FastAPI(
+          title="JSON Master API",
+          description="由JSON格式化大师提供的API服务",
+          version="1.0.0"
+      )
 
-# 添加CORS中间件
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+      # 添加CORS中间件
+      app.add_middleware(
+          CORSMiddleware,
+          allow_origins=["*"],
+          allow_credentials=True,
+          allow_methods=["*"],
+          allow_headers=["*"],
+      )
 
-# 存储当前JSON数据
-current_json_data = {}
+      # 存储当前JSON数据
+      current_json_data = {}
 
-# 数据模型
-class JsonData(BaseModel):
-    data: Dict[str, Any]
+      # 数据模型
+      class JsonData(BaseModel):
+          data: Dict[str, Any]
 
-# 获取JSON数据
-@app.get("/json-data")
-async def get_json_data():
-    return current_json_data
+      # 获取JSON数据
+      @app.get("/json-data")
+      async def get_json_data():
+          return current_json_data
 
-# 更新JSON数据
-@app.post("/json-data")
-async def update_json_data(json_data: JsonData):
-    global current_json_data
-    current_json_data = json_data.data
-    return {"status": "success", "message": "JSON数据已更新"}
+      # 更新JSON数据
+      @app.post("/json-data")
+      async def update_json_data(json_data: JsonData):
+          global current_json_data
+          current_json_data = json_data.data
+          return {"status": "success", "message": "JSON数据已更新"}
 
-# 关闭服务器
-@app.post("/shutdown")
-async def shutdown():
-    # 在单独的线程中关闭服务器
-    def stop_server():
-        uvicorn.Server.should_exit = True
-    
-    threading.Thread(target=stop_server).start()
-    return {"status": "success", "message": "服务器正在关闭"}
+      # 关闭服务器
+      @app.post("/shutdown")
+      async def shutdown():
+          # 在单独的线程中关闭服务器
+          def stop_server():
+              uvicorn.Server.should_exit = True
+          
+          threading.Thread(target=stop_server).start()
+          return {"status": "success", "message": "服务器正在关闭"}
 
-# 初始化JSON数据
-def init_json_data(data):
-    global current_json_data
-    current_json_data = data
+      # 初始化JSON数据
+      def init_json_data(data):
+          global current_json_data
+          current_json_data = data
 
-# 启动服务器
-def start_server(json_data=None):
-    if json_data:
-        init_json_data(json_data)
-    
-    uvicorn.run(app, host="127.0.0.1", port=8000)
+      # 启动服务器
+      def start_server(json_data=None):
+          if json_data:
+              init_json_data(json_data)
+          
+          uvicorn.run(app, host="127.0.0.1", port=8000)
 
-if __name__ == "__main__":
-    # 从命令行参数获取JSON数据
-    import sys
-    if len(sys.argv) > 1:
-        try:
-            data = json.loads(sys.argv[1])
-            start_server(data)
-        except json.JSONDecodeError:
-            print("无效的JSON数据")
-            start_server({})
-    else:
-        start_server({})
-`;
+      if __name__ == "__main__":
+          # 从命令行参数获取JSON数据
+          import sys
+          if len(sys.argv) > 1:
+              try:
+                  data = json.loads(sys.argv[1])
+                  start_server(data)
+              except json.JSONDecodeError:
+                  print("无效的JSON数据")
+                  start_server({})
+          else:
+              start_server({})
+      `;
 
     // 使用Blob和URL创建一个可下载的链接
     const blob = new Blob([pythonCode], { type: 'text/plain' });

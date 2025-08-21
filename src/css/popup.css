@@ -158,20 +158,47 @@ select {
   padding: 16px;
   background-color: var(--bg-primary);
   overflow: hidden;
+  display: flex;
+  position: relative;
+}
+
+.line-numbers {
+  width: 50px;
+  height: 100%;
+  background-color: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: var(--font-size);
+  padding: 12px 8px 12px 0;
+  text-align: right;
+  border: 1px solid var(--border-color);
+  border-right: none;
+  border-top-left-radius: 4px;
+  border-bottom-left-radius: 4px;
+  overflow-y: hidden;
+  user-select: none;
+  line-height: 1.5;
+  white-space: pre;
+}
+
+.line-number {
+  padding-right: 8px;
 }
 
 #json-input {
-  width: 100%;
+  width: calc(100% - 50px);
   height: 100%;
   background-color: var(--bg-primary);
   color: var(--text-primary);
   border: 1px solid var(--border-color);
-  border-radius: 4px;
+  border-radius: 0 4px 4px 0;
   padding: 12px;
   font-family: 'Consolas', 'Monaco', monospace;
   font-size: var(--font-size);
   resize: none;
   outline: none;
+  line-height: 1.5;
+  overflow-y: auto;
 }
 
 .status-bar {

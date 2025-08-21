@@ -36,13 +36,13 @@ function setupEventListeners() {
   });
 
   // 字体大小调整
-  document.getElementById('font-decrease').addEventListener('click', () => {
-    fontManager.decrease();
-  });
+  // document.getElementById('font-decrease').addEventListener('click', () => {
+  //   fontManager.decrease();
+  // });
 
-  document.getElementById('font-increase').addEventListener('click', () => {
-    fontManager.increase();
-  });
+  // document.getElementById('font-increase').addEventListener('click', () => {
+  //   fontManager.increase();
+  // });
 
   // JSON操作按钮
   document.getElementById('format-btn').addEventListener('click', formatJSON);
@@ -282,6 +282,7 @@ function checkApiServerStatus() {
 // 启动API服务器
 function startApiServer() {
   const input = document.getElementById('json-input');
+  debugger;
   try {
     const jsonString = input.value.trim() || '{}';
     

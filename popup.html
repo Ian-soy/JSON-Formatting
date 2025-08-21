@@ -29,14 +29,15 @@
       <button id="share-btn" class="btn secondary">分享</button>
       <button id="to-api-btn" class="btn secondary">转API</button>
       
-      <div class="font-size-control">
+      <!-- <div class="font-size-control">
         <button id="font-decrease" class="btn icon">A-</button>
         <span id="font-size-display">14px</span>
         <button id="font-increase" class="btn icon">A+</button>
-      </div>
+      </div> -->
     </div>
     
     <div class="editor-container">
+      <div class="line-numbers" id="line-numbers"></div>
       <textarea id="json-input" placeholder="在此粘贴JSON数据..."></textarea>
     </div>
     
@@ -82,6 +83,7 @@
   <script src="src/js/error-handler.js"></script>
   <script src="src/js/performance-optimizer.js"></script>
   <script src="src/js/api-handler.js"></script>
+  <script src="src/js/line-numbers.js"></script>
   
   <!-- 主应用脚本 -->
   <script src="src/js/popup.js"></script>
