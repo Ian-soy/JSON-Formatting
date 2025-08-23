@@ -1,6 +1,8 @@
 // 全局变量
 let apiRunning = false;
 let jsonData = {};
+let currentActiveHistoryItem = null;
+let historyManager = null;
 
 // DOM元素
 document.addEventListener('DOMContentLoaded', () => {
@@ -28,6 +30,16 @@ async function initializeModules() {
     // 初始化图标
     initializeIcons();
     
+    // 初始化数据管理器
+    await dataManager.initialize();
+    
+    // 初始化设置管理器
+    settingsManager.initialize(dataManager);
+    
+    // 初始化历史数据管理器
+    historyManager = new HistoryManager(dataManager);
+    await historyManager.initialize();
+    
     // 检查API服务器状态
     checkApiServerStatus();
   } catch (error) {
@@ -47,6 +59,16 @@ function initializeIcons() {
   document.querySelector('#convert-btn .icon-container').innerHTML = IconManager.getIcon('convert');
   document.querySelector('#share-btn .icon-container').innerHTML = IconManager.getIcon('share');
   document.querySelector('#to-api-btn .icon-container').innerHTML = IconManager.getIcon('api');
+  
+  // 新增按钮图标
+  const saveBtn = document.querySelector('#save-btn .icon-container');
+  if (saveBtn) saveBtn.innerHTML = IconManager.getIcon('save');
+  
+  const settingsBtn = document.querySelector('#settings-btn .icon-container');
+  if (settingsBtn) settingsBtn.innerHTML = IconManager.getIcon('settings');
+  
+  const refreshBtn = document.querySelector('#refresh-history-btn .icon-container');
+  if (refreshBtn) refreshBtn.innerHTML = IconManager.getIcon('refresh');
 }
 
 // 设置事件监听器（使用性能优化）
@@ -78,6 +100,10 @@ function setupEventListeners() {
   document.getElementById('share-btn').addEventListener('click', showShareModal);
   document.getElementById('to-api-btn').addEventListener('click', showApiModal);
 
+  // 新增功能按钮
+  document.getElementById('save-btn').addEventListener('click', showSaveModal);
+  document.getElementById('settings-btn').addEventListener('click', () => settingsManager.toggleSettings());
+
   // 输入框事件（使用防抖优化）
   document.getElementById('json-input').addEventListener('input', 
     performanceOptimizer.debounce(() => {
@@ -107,6 +133,28 @@ function setupEventListeners() {
 
   // 分享模态框按钮
   document.getElementById('copy-share-link').addEventListener('click', copyShareLink);
+
+  // 保存模态框按钮
+  const confirmSaveBtn = document.getElementById('confirm-save-btn');
+  if (confirmSaveBtn) {
+    confirmSaveBtn.addEventListener('click', saveCurrentData);
+  }
+
+  const cancelSaveBtn = document.getElementById('cancel-save-btn');
+  if (cancelSaveBtn) {
+    cancelSaveBtn.addEventListener('click', closeSaveModal);
+  }
+
+  // 保存模态框输入验证
+  const saveTitleInput = document.getElementById('save-title-input');
+  if (saveTitleInput) {
+    saveTitleInput.addEventListener('input', validateSaveTitle);
+    saveTitleInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        saveCurrentData();
+      }
+    });
+  }
 
   // 点击模态框外部关闭
   window.addEventListener('click', (e) => {
@@ -596,3 +644,121 @@ const updateStatus = performanceOptimizer.debounce((message, type = '') => {
     statusElement.className = '';
   }, 3000);
 }, 100);
+
+// ==== 新增功能函数 ====
+
+// 显示保存模态框
+function showSaveModal() {
+  const input = document.getElementById('json-input');
+  const jsonString = input.value.trim();
+  
+  if (!jsonString) {
+    updateStatus('没有JSON数据可保存', 'error');
+    return;
+  }
+  
+  // 验证JSON格式
+  const validation = dataManager.validateJson(jsonString);
+  if (!validation.valid) {
+    updateStatus('无效的JSON格式，无法保存', 'error');
+    return;
+  }
+  
+  // 清空输入框和错误信息
+  const saveTitleInput = document.getElementById('save-title-input');
+  const saveErrorElement = document.getElementById('save-title-error');
+  
+  if (saveTitleInput) {
+    saveTitleInput.value = '';
+    saveTitleInput.classList.remove('error');
+    saveTitleInput.focus();
+  }
+  
+  if (saveErrorElement) {
+    saveErrorElement.style.display = 'none';
+  }
+  
+  // 显示模态框
+  document.getElementById('save-modal').style.display = 'block';
+}
+
+// 关闭保存模态框
+function closeSaveModal() {
+  document.getElementById('save-modal').style.display = 'none';
+}
+
+// 验证保存标题
+function validateSaveTitle() {
+  const input = document.getElementById('save-title-input');
+  const errorElement = document.getElementById('save-title-error');
+  const title = input.value.trim();
+  
+  if (!title) {
+    showSaveError(input, errorElement, '请输入保存标题');
+    return false;
+  }
+  
+  if (title.length > 50) {
+    showSaveError(input, errorElement, '标题长度不能超过50个字符');
+    return false;
+  }
+  
+  hideSaveError(input, errorElement);
+  return true;
+}
+
+// 显示保存错误
+function showSaveError(input, errorElement, message) {
+  input.classList.add('error');
+  errorElement.textContent = message;
+  errorElement.style.display = 'block';
+  
+  // 确保错误提示在模态框内可见
+  setTimeout(() => {
+    errorElement.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, 100);
+}
+
+// 隐藏保存错误
+function hideSaveError(input, errorElement) {
+  input.classList.remove('error');
+  errorElement.style.display = 'none';
+}
+
+// 保存当前数据
+async function saveCurrentData() {
+  const titleInput = document.getElementById('save-title-input');
+  const jsonInput = document.getElementById('json-input');
+  const errorElement = document.getElementById('save-title-error');
+  
+  if (!validateSaveTitle()) {
+    return;
+  }
+  
+  const title = titleInput.value.trim();
+  const jsonData = jsonInput.value.trim();
+  
+  try {
+    // 显示保存中状态
+    updateStatus('正在保存...', '');
+    
+    const result = await dataManager.saveJsonData(title, jsonData);
+    
+    if (result.success) {
+      updateStatus(`保存成功：${title}`, 'success');
+      closeSaveModal();
+      
+      // 触发历史数据刷新
+      const event = new CustomEvent('historyDataChanged');
+      document.dispatchEvent(event);
+    } else {
+      // 使用新的错误提示样式
+      showSaveError(titleInput, errorElement, result.error);
+      updateStatus(result.error, 'error');
+    }
+  } catch (error) {
+    console.error('保存数据失败:', error);
+    showSaveError(titleInput, errorElement, '保存失败，请重试');
+    updateStatus('保存失败，请重试', 'error');
+  }
+}
