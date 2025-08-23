@@ -1,5 +1,5 @@
 :root {
-  /* 监控主题变量 - 默认主题 */
+  /* 主题变量 - 统一管理 */
   --bg-primary: #171b2e;
   --bg-secondary: #1e2235;
   --text-primary: #e0e0e0;
@@ -13,52 +13,31 @@
   --btn-hover: #2f3650;
   --card-bg: #232840;
   --purple-color: #8b5cf6;
-  --status-normal: #22c55e;
-  --status-error: #ef4444;
-  --status-warning: #f59e0b;
-  --status-unknown: #f8fafc;
-  --status-pending: #8b5cf6;
   --font-size: 14px;
 }
 
-/* 监控主题 - 保留类名以兼容现有代码 */
-.theme-monitor {
-  --bg-primary: #171b2e;
-  --bg-secondary: #1e2235;
-  --text-primary: #e0e0e0;
-  --text-secondary: #a0a0a0;
-  --accent-color: #6366f1;
-  --error-color: #ef4444;
-  --success-color: #22c55e;
-  --warning-color: #f59e0b;
-  --info-color: #3b82f6;
-  --border-color: #252a40;
-  --btn-hover: #2f3650;
-  --card-bg: #232840;
-  --purple-color: #8b5cf6;
-  --status-normal: #22c55e;
-  --status-error: #ef4444;
-  --status-warning: #f59e0b;
-  --status-unknown: #f8fafc;
-  --status-pending: #8b5cf6;
-}
-
-* {
+/* 基础样式重置 - 优化性能 */
+*, *::before, *::after {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
+/* 字体优化 - 减少重绘 */
 html, body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
   width: 100%;
   height: 100%;
+  font-size: var(--font-size);
 }
 
 body {
   background-color: var(--bg-primary);
   color: var(--text-primary);
-  transition: all 0.3s ease;
+  -webkit-transition: background-color 0.3s ease;
+  -moz-transition: background-color 0.3s ease;
+  transition: background-color 0.3s ease;
+  overflow: hidden;
 }
 
 .container {

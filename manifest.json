@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "JSON格式化大师",
   "version": "1.0.0",
-  "description": "一款功能强大的JSON格式化工具，支持格式化、压缩、错误修复、API生成等功能",
+  "description": "一款功能强大的JSON格式化工具，支持格式化、压缩、错误修复等功能",
   "icons": {
     "16": "src/images/icon16.png",
     "48": "src/images/icon48.png",
