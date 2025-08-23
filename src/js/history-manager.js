@@ -4,6 +4,7 @@ class HistoryManager {
     this.dataManager = dataManager;
     this.historyListElement = null;
     this.currentActiveItem = null;
+    this.isCollapsed = false; // 添加折叠状态
   }
 
   /**
@@ -12,6 +13,7 @@ class HistoryManager {
   async initialize() {
     this.historyListElement = document.getElementById('history-list');
     this.setupEventListeners();
+    this.initializeToggleButton(); // 初始化展开/折叠按钮
     await this.refreshHistoryList();
   }
 
@@ -23,6 +25,12 @@ class HistoryManager {
     const refreshBtn = document.getElementById('refresh-history-btn');
     if (refreshBtn) {
       refreshBtn.addEventListener('click', () => this.refreshHistoryList());
+    }
+
+    // 展开/折叠按钮事件
+    const toggleBtn = document.getElementById('history-toggle-btn');
+    if (toggleBtn) {
+      toggleBtn.addEventListener('click', () => this.toggleHistoryPanel());
     }
 
     // 监听历史数据变化事件
@@ -311,5 +319,42 @@ class HistoryManager {
       activeItem.classList.remove('active');
     }
     this.currentActiveItem = null;
+  }
+
+  /**
+   * 切换历史面板的展开/折叠状态
+   */
+  toggleHistoryPanel() {
+    const historySection = document.getElementById('history-section');
+    const toggleBtn = document.getElementById('history-toggle-btn');
+    
+    if (!historySection || !toggleBtn) return;
+
+    this.isCollapsed = !this.isCollapsed;
+    
+    if (this.isCollapsed) {
+      // 折叠状态
+      historySection.classList.add('collapsed');
+      toggleBtn.title = '展开历史面板';
+      // 更新图标为向右箭头
+      toggleBtn.querySelector('.icon-container').innerHTML = IconManager.getIcon('chevron-right');
+    } else {
+      // 展开状态
+      historySection.classList.remove('collapsed');
+      toggleBtn.title = '折叠历史面板';
+      // 更新图标为向左箭头
+      toggleBtn.querySelector('.icon-container').innerHTML = IconManager.getIcon('chevron-left');
+    }
+  }
+
+  /**
+   * 初始化展开/折叠按钮图标
+   */
+  initializeToggleButton() {
+    const toggleBtn = document.getElementById('history-toggle-btn');
+    if (toggleBtn) {
+      // 默认状态为展开，显示向左箭头（折叠）
+      toggleBtn.querySelector('.icon-container').innerHTML = IconManager.getIcon('chevron-left');
+    }
   }
 }
