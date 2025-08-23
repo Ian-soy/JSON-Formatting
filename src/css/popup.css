@@ -498,12 +498,24 @@ table tr:hover {
   margin-bottom: 16px;
 }
 
-.api-info, .api-endpoint, .share-options {
+.api-info, .api-endpoint, .share-options, .convert-options {
   margin-top: 20px;
 }
 
 .api-info p, .api-endpoint p {
   margin-bottom: 10px;
+}
+
+.convert-options {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.convert-options button {
+  width: 100%;
+  padding: 10px;
+  text-align: center;
 }
 
 #share-link {

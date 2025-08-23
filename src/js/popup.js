@@ -57,6 +57,8 @@ function setupEventListeners() {
   document.getElementById('minify-btn').addEventListener('click', minifyJSON);
   document.getElementById('fix-btn').addEventListener('click', fixJSON);
   document.getElementById('copy-btn').addEventListener('click', copyJSON);
+  document.getElementById('download-btn').addEventListener('click', downloadJSON);
+  document.getElementById('convert-btn').addEventListener('click', showConvertModal);
   document.getElementById('share-btn').addEventListener('click', showShareModal);
   document.getElementById('to-api-btn').addEventListener('click', showApiModal);
 
@@ -76,6 +78,10 @@ function setupEventListeners() {
       });
     });
   });
+
+  // 格式转换模态框按钮
+  document.getElementById('to-xml-btn').addEventListener('click', convertToXml);
+  document.getElementById('to-csv-btn').addEventListener('click', convertToCsv);
 
   // API模态框按钮
   document.getElementById('start-api-btn').addEventListener('click', startApiServer);
@@ -486,6 +492,80 @@ function copyApiUrl() {
 // 打开API文档
 function openApiDocs() {
   chrome.tabs.create({ url: 'http://localhost:8000/docs' });
+}
+
+// 下载JSON文件
+function downloadJSON() {
+  const input = document.getElementById('json-input');
+  try {
+    const jsonString = input.value.trim();
+    
+    // 验证JSON是否有效
+    if (!JsonUtils.isValid(jsonString)) {
+      updateStatus('无效的JSON数据，无法下载', 'error');
+      return;
+    }
+    
+    // 下载格式化后的JSON
+    const formatted = JSON.stringify(JSON.parse(jsonString), null, 2);
+    FormatConverter.downloadFile(formatted, 'data.json', 'application/json');
+    updateStatus('JSON文件已下载', 'success');
+  } catch (error) {
+    updateStatus(`下载错误: ${error.message}`, 'error');
+  }
+}
+
+// 显示格式转换模态框
+function showConvertModal() {
+  document.getElementById('convert-modal').style.display = 'block';
+}
+
+// 转换为XML
+function convertToXml() {
+  const input = document.getElementById('json-input');
+  try {
+    const jsonString = input.value.trim();
+    
+    // 验证JSON是否有效
+    if (!JsonUtils.isValid(jsonString)) {
+      updateStatus('无效的JSON数据，无法转换', 'error');
+      return;
+    }
+    
+    const jsonData = JSON.parse(jsonString);
+    const xmlString = FormatConverter.jsonToXml(jsonData);
+    FormatConverter.downloadFile(xmlString, 'data.xml', 'application/xml');
+    
+    // 关闭模态框
+    document.getElementById('convert-modal').style.display = 'none';
+    updateStatus('已转换为XML并下载', 'success');
+  } catch (error) {
+    updateStatus(`转换错误: ${error.message}`, 'error');
+  }
+}
+
+// 转换为CSV
+function convertToCsv() {
+  const input = document.getElementById('json-input');
+  try {
+    const jsonString = input.value.trim();
+    
+    // 验证JSON是否有效
+    if (!JsonUtils.isValid(jsonString)) {
+      updateStatus('无效的JSON数据，无法转换', 'error');
+      return;
+    }
+    
+    const jsonData = JSON.parse(jsonString);
+    const csvString = FormatConverter.jsonToCsv(jsonData);
+    FormatConverter.downloadFile(csvString, 'data.csv', 'text/csv');
+    
+    // 关闭模态框
+    document.getElementById('convert-modal').style.display = 'none';
+    updateStatus('已转换为CSV并下载', 'success');
+  } catch (error) {
+    updateStatus(`转换错误: ${error.message}`, 'error');
+  }
 }
 
 // 更新状态消息（使用防抖）

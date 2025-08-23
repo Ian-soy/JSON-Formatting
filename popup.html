@@ -24,6 +24,8 @@
       <button id="minify-btn" class="btn secondary">压缩</button>
       <button id="fix-btn" class="btn secondary">修复</button>
       <button id="copy-btn" class="btn secondary">复制</button>
+      <button id="download-btn" class="btn secondary">下载JSON</button>
+      <button id="convert-btn" class="btn secondary">格式转换</button>
       <button id="share-btn" class="btn secondary">分享</button>
       <button id="to-api-btn" class="btn secondary">转API</button>
       
@@ -79,6 +81,17 @@
         </div>
       </div>
     </div>
+    
+    <div id="convert-modal" class="modal">
+      <div class="modal-content">
+        <span class="close-btn">&times;</span>
+        <h2>格式转换</h2>
+        <div class="convert-options">
+          <button id="to-xml-btn" class="btn secondary">转换为XML</button>
+          <button id="to-csv-btn" class="btn secondary">转换为CSV</button>
+        </div>
+      </div>
+    </div>
   </div>
   
   <!-- 工具模块 -->
@@ -90,6 +103,7 @@
   <script src="src/js/performance-optimizer.js"></script>
   <script src="src/js/api-handler.js"></script>
   <script src="src/js/line-numbers.js"></script>
+  <script src="src/js/format-converter.js"></script>
   
   <!-- 主应用脚本 -->
   <script src="src/js/popup.js"></script>
