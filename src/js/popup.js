@@ -15,7 +15,14 @@ async function initializeModules() {
   try {
     // 初始化主题
     await themeManager.initialize();
-    document.getElementById('theme-selector').value = themeManager.getCurrentTheme();
+    const currentTheme = themeManager.getCurrentTheme();
+    document.getElementById('theme-selector').value = currentTheme;
+    
+    // 处理监控主题特殊元素
+    const monitorAddBtnContainer = document.getElementById('monitor-add-btn-container');
+    if (monitorAddBtnContainer) {
+      monitorAddBtnContainer.style.display = currentTheme === 'monitor' ? 'block' : 'none';
+    }
     
     // 初始化字体大小
     await fontManager.initialize();
@@ -34,6 +41,14 @@ function setupEventListeners() {
   document.getElementById('theme-selector').addEventListener('change', (e) => {
     themeManager.applyTheme(e.target.value);
   });
+  
+  // 监控主题添加按钮
+  const addBtn = document.querySelector('.add-btn');
+  if (addBtn) {
+    addBtn.addEventListener('click', () => {
+      updateStatus('添加监控项目功能即将上线', 'info');
+    });
+  }
 
   // 字体大小调整
   // document.getElementById('font-decrease').addEventListener('click', () => {
@@ -54,7 +69,10 @@ function setupEventListeners() {
 
   // 输入框事件（使用防抖优化）
   document.getElementById('json-input').addEventListener('input', 
-    performanceOptimizer.debounce(updateCharCount, 300)
+    performanceOptimizer.debounce(() => {
+      updateCharCount();
+      LineNumberManager.updateLineNumbersStatic();
+    }, 300)
   );
 
   // 模态框关闭按钮
@@ -116,6 +134,11 @@ function formatJSON() {
       jsonData = JSON.parse(result);
       updateStatus('JSON格式化成功', 'success');
       updateCharCount();
+      
+      // 确保行号更新
+      setTimeout(() => {
+        LineNumberManager.updateLineNumbersStatic();
+      }, 10);
     })
     .catch(error => {
       updateStatus(error.message, 'error');
@@ -128,6 +151,11 @@ function formatJSON() {
         input.value = result.result;
         jsonData = result.data;
         updateStatus('JSON格式化成功', 'success');
+        
+        // 确保行号更新
+        setTimeout(() => {
+          LineNumberManager.updateLineNumbersStatic();
+        }, 10);
       } else {
         updateStatus(`格式化错误: ${result.error}`, 'error');
       }
@@ -149,6 +177,11 @@ function minifyJSON() {
       input.value = result.result;
       jsonData = result.data;
       updateStatus('JSON压缩成功', 'success');
+      
+      // 确保行号更新
+      setTimeout(() => {
+        LineNumberManager.updateLineNumbersStatic();
+      }, 10);
     } else {
       updateStatus(`压缩错误: ${result.error}`, 'error');
     }
@@ -177,6 +210,11 @@ function fixJSON() {
       if (result.fixed) {
         updateStatus('JSON修复并格式化成功', 'success');
         jsonData = result.data;
+        
+        // 确保行号更新
+        setTimeout(() => {
+          LineNumberManager.updateLineNumbersStatic();
+        }, 10);
       } else {
         updateStatus('JSON已经是有效格式，无需修复', 'success');
       }

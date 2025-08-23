@@ -9,6 +9,12 @@ class LineNumberManager {
     this.fontManager = null;
     this.init();
   }
+  
+  // 静态方法，用于直接更新行号
+  static updateLineNumbersStatic() {
+    const instance = new LineNumberManager();
+    instance.updateLineNumbers();
+  }
 
   /**
    * 初始化行号管理器
@@ -47,15 +53,18 @@ class LineNumberManager {
    */
   getComputedLineHeight() {
     const computedStyle = window.getComputedStyle(this.textarea);
-    return computedStyle.lineHeight;
+    return computedStyle.lineHeight !== 'normal' ? computedStyle.lineHeight : '1.5';
   }
 
   /**
    * 更新行号显示
    */
   updateLineNumbers() {
+    // 获取文本内容
     const content = this.textarea.value;
-    const lines = content.split('\n');
+    
+    // 强制重新计算行数，确保即使是字符串JSON也能正确显示行号
+    let lines = content.split('\n');
     const lineCount = lines.length;
     
     // 清空当前行号
@@ -69,14 +78,24 @@ class LineNumberManager {
       const lineNumber = document.createElement('div');
       lineNumber.textContent = i;
       lineNumber.className = 'line-number';
+      
+      // 检查对应行的内容，调整样式
+      if (lines[i-1] && lines[i-1].trim().length > 0) {
+        // 有内容的行
+        lineNumber.classList.add('has-content');
+      } else {
+        // 空行
+        lineNumber.classList.add('empty-line');
+      }
+      
       fragment.appendChild(lineNumber);
     }
     
     // 确保至少有一行
-    if (lineCount === 0) {
+    if (lineCount === 0 || (lineCount === 1 && !lines[0].trim())) {
       const lineNumber = document.createElement('div');
       lineNumber.textContent = '1';
-      lineNumber.className = 'line-number';
+      lineNumber.className = 'line-number empty-line';
       fragment.appendChild(lineNumber);
     }
     

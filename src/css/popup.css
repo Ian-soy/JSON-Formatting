@@ -32,6 +32,28 @@
   --btn-hover: #2c4052;
 }
 
+/* 监控主题 */
+.theme-monitor {
+  --bg-primary: #171b2e;
+  --bg-secondary: #1e2235;
+  --text-primary: #e0e0e0;
+  --text-secondary: #a0a0a0;
+  --accent-color: #6366f1;
+  --error-color: #ef4444;
+  --success-color: #22c55e;
+  --warning-color: #f59e0b;
+  --info-color: #3b82f6;
+  --border-color: #252a40;
+  --btn-hover: #2f3650;
+  --card-bg: #232840;
+  --purple-color: #8b5cf6;
+  --status-normal: #22c55e;
+  --status-error: #ef4444;
+  --status-warning: #f59e0b;
+  --status-unknown: #f8fafc;
+  --status-pending: #8b5cf6;
+}
+
 /* 绿色主题 */
 .theme-green {
   --bg-primary: #1e2a1e;
@@ -119,18 +141,120 @@ select {
 .btn.primary {
   background-color: var(--accent-color);
   color: white;
+  border-radius: 4px;
 }
 
 .btn.secondary {
   background-color: var(--bg-primary);
   color: var(--text-primary);
   border: 1px solid var(--border-color);
+  border-radius: 4px;
 }
 
-/* .btn:hover {
-  background-color: var(--btn-hover);
+/* 监控主题按钮样式 */
+.theme-monitor .btn.primary {
+  background: linear-gradient(to right, #8b5cf6, #6366f1);
   color: white;
-} */
+  border-radius: 6px;
+  padding: 8px 16px;
+  font-weight: 500;
+  border: none;
+}
+
+.theme-monitor .btn.secondary {
+  background-color: transparent;
+  color: var(--text-primary);
+  border: none;
+  border-radius: 6px;
+  padding: 8px 16px;
+}
+
+.theme-monitor .btn.primary:hover {
+  opacity: 0.9;
+}
+
+.theme-monitor .btn.secondary:hover {
+  background-color: var(--btn-hover);
+}
+
+/* 监控主题卡片样式 */
+.theme-monitor .card {
+  background-color: var(--card-bg);
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* 监控主题状态样式 */
+.theme-monitor .status-normal {
+  color: var(--status-normal);
+}
+
+.theme-monitor .status-warning {
+  color: var(--status-warning);
+}
+
+.theme-monitor .status-error {
+  color: var(--status-error);
+}
+
+.theme-monitor .status-info {
+  color: var(--info-color);
+}
+
+.theme-monitor .status-unknown {
+  color: var(--status-unknown);
+}
+
+.theme-monitor .status-pending {
+  color: var(--status-pending);
+}
+
+/* 监控主题状态标签 */
+.theme-monitor .status-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.theme-monitor .status-tag.normal {
+  background-color: rgba(34, 197, 94, 0.2);
+  color: var(--status-normal);
+}
+
+.theme-monitor .status-tag.error {
+  background-color: rgba(239, 68, 68, 0.2);
+  color: var(--status-error);
+}
+
+.theme-monitor .status-tag.warning {
+  background-color: rgba(245, 158, 11, 0.2);
+  color: var(--status-warning);
+}
+
+.theme-monitor .status-tag.unknown {
+  background-color: rgba(248, 250, 252, 0.1);
+  color: var(--status-unknown);
+}
+
+.theme-monitor .status-tag.pending {
+  background-color: rgba(139, 92, 246, 0.2);
+  color: var(--status-pending);
+}
+
+/* 监控主题图标样式 */
+.theme-monitor .icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  margin-right: 4px;
+}
 
 .btn.primary:hover {
   opacity: 0.9;
@@ -162,6 +286,38 @@ select {
   position: relative;
 }
 
+.theme-monitor .editor-container {
+  padding: 0;
+  background-color: var(--bg-primary);
+  border-radius: 0;
+  display: flex;
+  overflow: hidden;
+}
+
+.theme-monitor #json-input {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  border: none;
+  border-radius: 0;
+  font-family: 'Consolas', 'Monaco', monospace;
+  padding: 12px;
+  flex: 1;
+  line-height: 1.5;
+}
+
+.theme-monitor .line-numbers {
+  background-color: var(--bg-primary);
+  border-radius: 0;
+  border: none;
+  border-right: none;
+  color: #666;
+  padding-top: 12px;
+  padding-bottom: 12px;
+  min-width: 30px;
+  text-align: right;
+  user-select: none;
+}
+
 .line-numbers {
   width: 50px;
   height: 100%;
@@ -183,6 +339,46 @@ select {
 
 .line-number {
   padding-right: 8px;
+  text-align: right;
+  min-width: 20px;
+}
+
+.line-number.has-content {
+  color: var(--text-secondary);
+}
+
+.line-number.empty-line {
+  color: var(--text-secondary);
+  opacity: 0.7;
+}
+
+/* 监控主题行号样式 */
+.theme-monitor .line-number {
+  color: #4b5563;
+  font-size: 13px;
+}
+
+/* 监控主题滚动条样式 */
+.theme-monitor ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.theme-monitor ::-webkit-scrollbar-track {
+  background: var(--bg-primary);
+}
+
+.theme-monitor ::-webkit-scrollbar-thumb {
+  background: #2d3348;
+  border-radius: 4px;
+}
+
+.theme-monitor ::-webkit-scrollbar-thumb:hover {
+  background: #3a4057;
+}
+
+.theme-monitor ::-webkit-scrollbar-corner {
+  background: var(--bg-primary);
 }
 
 #json-input {
@@ -211,6 +407,152 @@ select {
   color: var(--text-secondary);
 }
 
+.theme-monitor .status-bar {
+  background-color: var(--bg-primary);
+  border-top: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  padding: 8px 16px;
+  font-size: 12px;
+}
+
+.theme-monitor .header {
+  background-color: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+  padding: 12px 16px;
+}
+
+.theme-monitor .header h1 {
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.theme-monitor .toolbar {
+  background-color: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+  padding: 8px 16px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+/* 格式化按钮特殊样式 */
+.theme-monitor #format-btn {
+  background: linear-gradient(to right, #8b5cf6, #6366f1);
+  color: white;
+  border-radius: 6px;
+  padding: 8px 16px;
+  font-weight: 500;
+  border: none;
+}
+
+.theme-monitor #format-btn:hover {
+  opacity: 0.9;
+}
+
+/* 监控主题搜索框样式 */
+.theme-monitor .search-container {
+  position: relative;
+  width: 100%;
+  max-width: 240px;
+}
+
+.theme-monitor .search-input {
+  width: 100%;
+  padding: 6px 12px 6px 32px;
+  background-color: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+.theme-monitor .search-icon {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+/* 监控主题表格样式 */
+.theme-monitor .table-container {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.theme-monitor table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.theme-monitor table th {
+  text-align: left;
+  padding: 12px 16px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.theme-monitor table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.theme-monitor table tr:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+/* 监控主题统计卡片 */
+.theme-monitor .stats-container {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.theme-monitor .stat-card {
+  background-color: var(--card-bg);
+  border-radius: 8px;
+  padding: 16px;
+  flex: 1;
+  min-width: 120px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.theme-monitor .stat-card .title {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+
+.theme-monitor .stat-card .value {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.theme-monitor .stat-card.normal .value {
+  color: var(--status-normal);
+}
+
+.theme-monitor .stat-card.error .value {
+  color: var(--status-error);
+}
+
+.theme-monitor .stat-card.warning .value {
+  color: var(--status-warning);
+}
+
+.theme-monitor .stat-card.unknown .value {
+  color: var(--status-unknown);
+}
+
+.theme-monitor .stat-card.pending .value {
+  color: var(--status-pending);
+}
+
 /* 模态框样式 */
 .modal {
   display: none;
@@ -233,6 +575,64 @@ select {
   border-radius: 8px;
   width: 400px;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.theme-monitor .modal-content {
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  padding: 24px;
+}
+
+.theme-monitor .modal-content h2 {
+  font-size: 18px;
+  font-weight: 500;
+  margin-bottom: 16px;
+  color: var(--text-primary);
+}
+
+.theme-monitor .modal-content .close-btn {
+  color: var(--text-secondary);
+  font-size: 20px;
+  top: 16px;
+  right: 20px;
+}
+
+.theme-monitor .modal-content input[type="text"] {
+  width: 100%;
+  padding: 8px 12px;
+  background-color: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  color: var(--text-primary);
+  margin-bottom: 16px;
+}
+
+/* 添加监控主题特有的按钮样式 */
+.theme-monitor .add-btn {
+  background: linear-gradient(to right, #8b5cf6, #6366f1);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-weight: 500;
+  cursor: pointer;
+  width: 100%;
+  margin-bottom: 16px;
+  font-size: 15px;
+}
+
+.theme-monitor .add-btn:hover {
+  opacity: 0.9;
+}
+
+.theme-monitor .add-btn .icon {
+  font-size: 16px;
 }
 
 .close-btn {

@@ -6,6 +6,29 @@
 class ThemeManager {
   constructor() {
     this.themes = {
+      monitor: {
+        name: '监控',
+        variables: {
+          '--bg-primary': '#171b2e',
+          '--bg-secondary': '#1e2235',
+          '--text-primary': '#e0e0e0',
+          '--text-secondary': '#a0a0a0',
+          '--accent-color': '#6366f1',
+          '--error-color': '#ef4444',
+          '--success-color': '#22c55e',
+          '--warning-color': '#f59e0b',
+          '--info-color': '#3b82f6',
+          '--border-color': '#252a40',
+          '--btn-hover': '#2f3650',
+          '--card-bg': '#232840',
+          '--purple-color': '#8b5cf6',
+          '--status-normal': '#22c55e',
+          '--status-error': '#ef4444',
+          '--status-warning': '#f59e0b',
+          '--status-unknown': '#f8fafc',
+          '--status-pending': '#8b5cf6'
+        }
+      },
       dark: {
         name: '暗黑',
         variables: {
@@ -18,6 +41,29 @@ class ThemeManager {
           '--success-color': '#4caf50',
           '--border-color': '#333333',
           '--btn-hover': '#2a2d2e'
+        }
+      },
+      monitor: {
+        name: '监控',
+        variables: {
+          '--bg-primary': '#171b2e',
+          '--bg-secondary': '#1e2235',
+          '--text-primary': '#e0e0e0',
+          '--text-secondary': '#a0a0a0',
+          '--accent-color': '#6366f1',
+          '--error-color': '#ef4444',
+          '--success-color': '#22c55e',
+          '--warning-color': '#f59e0b',
+          '--info-color': '#3b82f6',
+          '--border-color': '#252a40',
+          '--btn-hover': '#2f3650',
+          '--card-bg': '#232840',
+          '--purple-color': '#8b5cf6',
+          '--status-normal': '#22c55e',
+          '--status-error': '#ef4444',
+          '--status-warning': '#f59e0b',
+          '--status-unknown': '#f8fafc',
+          '--status-pending': '#8b5cf6'
         }
       },
       light: {
@@ -74,7 +120,7 @@ class ThemeManager {
   async initialize() {
     return new Promise((resolve) => {
       chrome.storage.sync.get('theme', (data) => {
-        this.currentTheme = data.theme || 'dark';
+        this.currentTheme = data.theme || 'monitor';
         this.applyTheme(this.currentTheme);
         resolve(this.currentTheme);
       });
@@ -102,6 +148,12 @@ class ThemeManager {
     // 添加主题类名
     document.body.className = '';
     document.body.classList.add(`theme-${themeName}`);
+    
+    // 处理监控主题特殊元素
+    const monitorAddBtnContainer = document.getElementById('monitor-add-btn-container');
+    if (monitorAddBtnContainer) {
+      monitorAddBtnContainer.style.display = themeName === 'monitor' ? 'block' : 'none';
+    }
     
     // 保存到存储
     chrome.storage.sync.set({ theme: themeName });
