@@ -1,0 +1,481 @@
+{
+  "test_data": {
+    "users": [
+      {
+        "user_id": 1,
+        "username": "user_001",
+        "email": "user001@example.com",
+        "phone": "13800138001",
+        "registration_date": "2023-01-01T08:00:00Z",
+        "status": "active",
+        "addresses": [
+          {
+            "address_id": 101,
+            "province": "北京市",
+            "city": "北京市",
+            "district": "朝阳区",
+            "detail": "建国路88号",
+            "is_default": true
+          },
+          {
+            "address_id": 102,
+            "province": "上海市",
+            "city": "上海市",
+            "district": "浦东新区",
+            "detail": "张江高科技园区博云路2号",
+            "is_default": false
+          }
+        ],
+        "preferences": {
+          "language": "zh-CN",
+          "theme": "light",
+          "notifications": {
+            "email": true,
+            "sms": false,
+            "push": true
+          }
+        }
+      },
+      {
+        "user_id": 2,
+        "username": "user_002",
+        "email": "user002@example.com",
+        "phone": "13900139002",
+        "registration_date": "2023-01-02T09:15:00Z",
+        "status": "active",
+        "addresses": [
+          {
+            "address_id": 103,
+            "province": "广东省",
+            "city": "广州市",
+            "district": "天河区",
+            "detail": "天河路385号",
+            "is_default": true
+          }
+        ],
+        "preferences": {
+          "language": "zh-CN",
+          "theme": "dark",
+          "notifications": {
+            "email": true,
+            "sms": true,
+            "push": false
+          }
+        }
+      },
+      {
+        "user_id": 3,
+        "username": "user_003",
+        "email": "user003@example.com",
+        "phone": "13700137003",
+        "registration_date": "2023-01-03T10:30:00Z",
+        "status": "inactive",
+        "addresses": [],
+        "preferences": {
+          "language": "en-US",
+          "theme": "light",
+          "notifications": {
+            "email": false,
+            "sms": false,
+            "push": false
+          }
+        }
+      },
+      {
+        "user_id": 4,
+        "username": "user_004",
+        "email": "user004@example.com",
+        "phone": "13600136004",
+        "registration_date": "2023-01-04T11:45:00Z",
+        "status": "active",
+        "addresses": [
+          {
+            "address_id": 104,
+            "province": "江苏省",
+            "city": "南京市",
+            "district": "鼓楼区",
+            "detail": "中山路18号",
+            "is_default": true
+          },
+          {
+            "address_id": 105,
+            "province": "江苏省",
+            "city": "苏州市",
+            "district": "工业园区",
+            "detail": "金鸡湖大道128号",
+            "is_default": false
+          }
+        ],
+        "preferences": {
+          "language": "zh-CN",
+          "theme": "light",
+          "notifications": {
+            "email": true,
+            "sms": true,
+            "push": true
+          }
+        }
+      },
+      {
+        "user_id": 5,
+        "username": "user_005",
+        "email": "user005@example.com",
+        "phone": "13500135005",
+        "registration_date": "2023-01-05T13:00:00Z",
+        "status": "active",
+        "addresses": [
+          {
+            "address_id": 106,
+            "province": "浙江省",
+            "city": "杭州市",
+            "district": "西湖区",
+            "detail": "西湖大道58号",
+            "is_default": true
+          }
+        ],
+        "preferences": {
+          "language": "zh-CN",
+          "theme": "dark",
+          "notifications": {
+            "email": false,
+            "sms": true,
+            "push": true
+          }
+        }
+      },
+      {
+        "user_id": 6,
+        "username": "user_006",
+        "email": "user006@example.com",
+        "phone": "13400134006",
+        "registration_date": "2023-01-06T14:15:00Z",
+        "status": "suspended",
+        "addresses": [
+          {
+            "address_id": 107,
+            "province": "四川省",
+            "city": "成都市",
+            "district": "锦江区",
+            "detail": "春熙路25号",
+            "is_default": true
+          }
+        ],
+        "preferences": {
+          "language": "zh-CN",
+          "theme": "light",
+          "notifications": {
+            "email": true,
+            "sms": false,
+            "push": false
+          }
+        }
+      },
+      {
+        "user_id": 7,
+        "username": "user_007",
+        "email": "user007@example.com",
+        "phone": "13300133007",
+        "registration_date": "2023-01-07T15:30:00Z",
+        "status": "active",
+        "addresses": [
+          {
+            "address_id": 108,
+            "province": "山东省",
+            "city": "济南市",
+            "district": "历下区",
+            "detail": "泉城路101号",
+            "is_default": true
+          },
+          {
+            "address_id": 109,
+            "province": "山东省",
+            "city": "青岛市",
+            "district": "市南区",
+            "detail": "香港中路38号",
+            "is_default": false
+          }
+        ],
+        "preferences": {
+          "language": "zh-CN",
+          "theme": "dark",
+          "notifications": {
+            "email": true,
+            "sms": true,
+            "push": false
+          }
+        }
+      },
+      {
+        "user_id": 8,
+        "username": "user_008",
+        "email": "user008@example.com",
+        "phone": "13200132008",
+        "registration_date": "2023-01-08T16:45:00Z",
+        "status": "active",
+        "addresses": [
+          {
+            "address_id": 110,
+            "province": "河南省",
+            "city": "郑州市",
+            "district": "金水区",
+            "detail": "花园路88号",
+            "is_default": true
+          }
+        ],
+        "preferences": {
+          "language": "zh-CN",
+          "theme": "light",
+          "notifications": {
+            "email": false,
+            "sms": false,
+            "push": true
+          }
+        }
+      },
+      {
+        "user_id": 9,
+        "username": "user_009",
+        "email": "user009@example.com",
+        "phone": "13100131009",
+        "registration_date": "2023-01-09T18:00:00Z",
+        "status": "inactive",
+        "addresses": [],
+        "preferences": {
+          "language": "en-US",
+          "theme": "dark",
+          "notifications": {
+            "email": true,
+            "sms": false,
+            "push": false
+          }
+        }
+      },
+      {
+        "user_id": 10,
+        "username": "user_010",
+        "email": "user010@example.com",
+        "phone": "13000130010",
+        "registration_date": "2023-01-10T19:15:00Z",
+        "status": "active",
+        "addresses": [
+          {
+            "address_id": 111,
+            "province": "湖北省",
+            "city": "武汉市",
+            "district": "武昌区",
+            "detail": "珞喻路152号",
+            "is_default": true
+          },
+          {
+            "address_id": 112,
+            "province": "湖北省",
+            "city": "武汉市",
+            "district": "江汉区",
+            "detail": "解放大道690号",
+            "is_default": false
+          }
+        ],
+        "preferences": {
+          "language": "zh-CN",
+          "theme": "dark",
+          "notifications": {
+            "email": true,
+            "sms": true,
+            "push": true
+          }
+        }
+      },
+      {
+        "user_id": 11,
+        "username": "user_011",
+        "email": "user011@example.com",
+        "phone": "18900189011",
+        "registration_date": "2023-01-11T20:30:00Z",
+        "status": "active",
+        "addresses": [
+          {
+            "address_id": 113,
+            "province": "湖南省",
+            "city": "长沙市",
+            "district": "芙蓉区",
+            "detail": "五一大道447号",
+            "is_default": true
+          }
+        ],
+        "preferences": {
+          "language": "zh-CN",
+          "theme": "light",
+          "notifications": {
+            "email": false,
+            "sms": true,
+            "push": false
+          }
+        }
+      },
+      {
+        "user_id": 12,
+        "username": "user_012",
+        "email": "user012@example.com",
+        "phone": "18800188012",
+        "registration_date": "2023-01-12T21:45:00Z",
+        "status": "suspended",
+        "addresses": [
+          {
+            "address_id": 114,
+            "province": "福建省",
+            "city": "福州市",
+            "district": "鼓楼区",
+            "detail": "东街口123号",
+            "is_default": true
+          }
+        ],
+        "preferences": {
+          "language": "zh-CN",
+          "theme": "dark",
+          "notifications": {
+            "email": true,
+            "sms": false,
+            "push": true
+          }
+        }
+      },
+      {
+        "user_id": 13,
+        "username": "user_013",
+        "email": "user013@example.com",
+        "phone": "18700187013",
+        "registration_date": "2023-01-13T23:00:00Z",
+        "status": "active",
+        "addresses": [
+          {
+            "address_id": 115,
+            "province": "安徽省",
+            "city": "合肥市",
+            "district": "庐阳区",
+            "detail": "长江路99号",
+            "is_default": true
+          },
+          {
+            "address_id": 116,
+            "province": "安徽省",
+            "city": "芜湖市",
+            "district": "镜湖区",
+            "detail": "中山路38号",
+            "is_default": false
+          }
+        ],
+        "preferences": {
+          "language": "zh-CN",
+          "theme": "light",
+          "notifications": {
+            "email": true,
+            "sms": true,
+            "push": false
+          }
+        }
+      },
+      {
+        "user_id": 14,
+        "username": "user_014",
+        "email": "user014@example.com",
+        "phone": "18600186014",
+        "registration_date": "2023-01-14T00:15:00Z",
+        "status": "inactive",
+        "addresses": [],
+        "preferences": {
+          "language": "en-US",
+          "theme": "light",
+          "notifications": {
+            "email": false,
+            "sms": false,
+            "push": false
+          }
+        }
+      },
+      {
+        "user_id": 15,
+        "username": "user_015",
+        "email": "user015@example.com",
+        "phone": "18500185015",
+        "registration_date": "2023-01-15T01:30:00Z",
+        "status": "active",
+        "addresses": [
+          {
+            "address_id": 117,
+            "province": "陕西省",
+            "city": "西安市",
+            "district": "雁塔区",
+            "detail": "长安南路45号",
+            "is_default": true
+          }
+        ],
+        "preferences": {
+          "language": "zh-CN",
+          "theme": "dark",
+          "notifications": {
+            "email": true,
+            "sms": false,
+            "push": true
+          }
+        }
+      },
+      {
+        "user_id": 16,
+        "username": "user_016",
+        "email": "user016@example.com",
+        "phone": "18400184016",
+        "registration_date": "2023-01-16T02:45:00Z",
+        "status": "active",
+        "addresses": [
+          {
+            "address_id": 118,
+            "province": "河北省",
+            "city": "石家庄市",
+            "district": "长安区",
+            "detail": "中山东路216号",
+            "is_default": true
+          },
+          {
+            "address_id": 119,
+            "province": "河北省",
+            "city": "唐山市",
+            "district": "路南区",
+            "detail": "新华东道100号",
+            "is_default": false
+          }
+        ],
+        "preferences": {
+          "language": "zh-CN",
+          "theme": "light",
+          "notifications": {
+            "email": false,
+            "sms": true,
+            "push": true
+          }
+        }
+      },
+      {
+        "user_id": 17,
+        "username": "user_017",
+        "email": "user017@example.com",
+        "phone": "18300183017",
+        "registration_date": "2023-01-17T04:00:00Z",
+        "status": "active",
+        "addresses": [
+          {
+            "address_id": 120,
+            "province": "山西省",
+            "city": "太原市",
+            "district": "杏花岭区",
+            "detail": "府东街95号",
+            "is_default": true
+          }
+        ],
+        "preferences": {
+          "language": "zh-CN",
+          "theme": "dark"
+        }
+      }
+    ]
+  }
+}

@@ -13,15 +13,13 @@ document.addEventListener('DOMContentLoaded', () => {
 // 初始化所有模块
 async function initializeModules() {
   try {
-    // 初始化主题
+    // 初始化主题（只使用监控主题）
     await themeManager.initialize();
-    const currentTheme = themeManager.getCurrentTheme();
-    document.getElementById('theme-selector').value = currentTheme;
     
-    // 处理监控主题特殊元素
+    // 显示监控主题特殊元素
     const monitorAddBtnContainer = document.getElementById('monitor-add-btn-container');
     if (monitorAddBtnContainer) {
-      monitorAddBtnContainer.style.display = currentTheme === 'monitor' ? 'block' : 'none';
+      monitorAddBtnContainer.style.display = 'block';
     }
     
     // 初始化字体大小
@@ -37,11 +35,6 @@ async function initializeModules() {
 
 // 设置事件监听器（使用性能优化）
 function setupEventListeners() {
-  // 主题切换
-  document.getElementById('theme-selector').addEventListener('change', (e) => {
-    themeManager.applyTheme(e.target.value);
-  });
-  
   // 监控主题添加按钮
   const addBtn = document.querySelector('.add-btn');
   if (addBtn) {

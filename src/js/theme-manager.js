@@ -28,89 +28,10 @@ class ThemeManager {
           '--status-unknown': '#f8fafc',
           '--status-pending': '#8b5cf6'
         }
-      },
-      dark: {
-        name: '暗黑',
-        variables: {
-          '--bg-primary': '#1e1e1e',
-          '--bg-secondary': '#252526',
-          '--text-primary': '#e0e0e0',
-          '--text-secondary': '#a0a0a0',
-          '--accent-color': '#0078d7',
-          '--error-color': '#f44336',
-          '--success-color': '#4caf50',
-          '--border-color': '#333333',
-          '--btn-hover': '#2a2d2e'
-        }
-      },
-      monitor: {
-        name: '监控',
-        variables: {
-          '--bg-primary': '#171b2e',
-          '--bg-secondary': '#1e2235',
-          '--text-primary': '#e0e0e0',
-          '--text-secondary': '#a0a0a0',
-          '--accent-color': '#6366f1',
-          '--error-color': '#ef4444',
-          '--success-color': '#22c55e',
-          '--warning-color': '#f59e0b',
-          '--info-color': '#3b82f6',
-          '--border-color': '#252a40',
-          '--btn-hover': '#2f3650',
-          '--card-bg': '#232840',
-          '--purple-color': '#8b5cf6',
-          '--status-normal': '#22c55e',
-          '--status-error': '#ef4444',
-          '--status-warning': '#f59e0b',
-          '--status-unknown': '#f8fafc',
-          '--status-pending': '#8b5cf6'
-        }
-      },
-      light: {
-        name: '明亮',
-        variables: {
-          '--bg-primary': '#ffffff',
-          '--bg-secondary': '#f5f5f5',
-          '--text-primary': '#333333',
-          '--text-secondary': '#666666',
-          '--accent-color': '#0078d7',
-          '--error-color': '#f44336',
-          '--success-color': '#4caf50',
-          '--border-color': '#dddddd',
-          '--btn-hover': '#e0e0e0'
-        }
-      },
-      blue: {
-        name: '蓝色',
-        variables: {
-          '--bg-primary': '#1a2733',
-          '--bg-secondary': '#203746',
-          '--text-primary': '#e0e0e0',
-          '--text-secondary': '#a0a0a0',
-          '--accent-color': '#61afef',
-          '--error-color': '#f44336',
-          '--success-color': '#4caf50',
-          '--border-color': '#2c4052',
-          '--btn-hover': '#2c4052'
-        }
-      },
-      green: {
-        name: '绿色',
-        variables: {
-          '--bg-primary': '#1e2a1e',
-          '--bg-secondary': '#263326',
-          '--text-primary': '#e0e0e0',
-          '--text-secondary': '#a0a0a0',
-          '--accent-color': '#6baa6b',
-          '--error-color': '#f44336',
-          '--success-color': '#4caf50',
-          '--border-color': '#2d3d2d',
-          '--btn-hover': '#2d3d2d'
-        }
       }
     };
     
-    this.currentTheme = 'dark';
+    this.currentTheme = 'monitor';
   }
   
   /**
@@ -119,11 +40,10 @@ class ThemeManager {
    */
   async initialize() {
     return new Promise((resolve) => {
-      chrome.storage.sync.get('theme', (data) => {
-        this.currentTheme = data.theme || 'monitor';
-        this.applyTheme(this.currentTheme);
-        resolve(this.currentTheme);
-      });
+      // 始终使用监控主题
+      this.currentTheme = 'monitor';
+      this.applyTheme(this.currentTheme);
+      resolve(this.currentTheme);
     });
   }
   
@@ -132,9 +52,8 @@ class ThemeManager {
    * @param {string} themeName - 主题名称
    */
   applyTheme(themeName) {
-    if (!this.themes[themeName]) {
-      console.error(`主题 "${themeName}" 不存在`);
-      return;
+    if (themeName !== 'monitor') {
+      themeName = 'monitor';
     }
     
     this.currentTheme = themeName;
@@ -149,14 +68,11 @@ class ThemeManager {
     document.body.className = '';
     document.body.classList.add(`theme-${themeName}`);
     
-    // 处理监控主题特殊元素
+    // 显示监控主题特殊元素
     const monitorAddBtnContainer = document.getElementById('monitor-add-btn-container');
     if (monitorAddBtnContainer) {
-      monitorAddBtnContainer.style.display = themeName === 'monitor' ? 'block' : 'none';
+      monitorAddBtnContainer.style.display = 'block';
     }
-    
-    // 保存到存储
-    chrome.storage.sync.set({ theme: themeName });
   }
   
   /**
