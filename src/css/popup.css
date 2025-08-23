@@ -1085,7 +1085,7 @@ table tr:hover {
   border-radius: 8px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
   padding: 24px;
-  width: 400px;
+  width: 450px;
   max-width: 90vw;
   max-height: 90vh;
   overflow-y: auto;
@@ -1095,7 +1095,7 @@ table tr:hover {
 .modal-content h2 {
   font-size: 18px;
   font-weight: 500;
-  margin-bottom: 20px;
+  margin-bottom: 24px;
   color: var(--text-primary);
   text-align: center;
 }
@@ -1107,6 +1107,7 @@ table tr:hover {
   font-size: 20px;
   cursor: pointer;
   color: var(--text-secondary);
+  transition: color 0.2s;
 }
 
 .close-btn:hover {
@@ -1115,12 +1116,19 @@ table tr:hover {
 
 .modal-content input[type="text"] {
   width: 100%;
-  padding: 8px 12px;
+  padding: 10px 12px;
   background-color: var(--bg-primary);
   border: 1px solid var(--border-color);
   border-radius: 6px;
   color: var(--text-primary);
   margin-bottom: 16px;
+  box-sizing: border-box;
+  transition: border-color 0.2s;
+}
+
+.modal-content input[type="text"]:focus {
+  outline: none;
+  border-color: var(--accent-color);
 }
 
 .api-info, .api-endpoint, .share-options, .convert-options {
@@ -1128,32 +1136,233 @@ table tr:hover {
 }
 
 .api-info p, .api-endpoint p {
-  margin-bottom: 10px;
+  margin-bottom: 12px;
+  color: var(--text-primary);
+  line-height: 1.5;
+  word-wrap: break-word;
+}
+
+/* API状态信息样式 */
+.api-info {
+  text-align: center;
+  padding: 16px 0;
+}
+
+.api-info p {
+  margin-bottom: 20px;
+  font-size: 14px;
+}
+
+.api-info button {
+  margin: 6px 8px;
+  min-width: 110px;
+  height: 38px;
+  white-space: nowrap;
+  font-size: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+}
+
+/* API接口地址样式 */
+.api-endpoint {
+  background-color: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 16px;
+  margin-top: 20px;
+}
+
+.api-endpoint > p {
+  display: block;
+  margin-bottom: 12px;
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+.api-endpoint > p:first-child {
+  margin-bottom: 8px;
+}
+
+.api-endpoint #api-url {
+  display: block;
+  font-family: 'Courier New', monospace;
+  background-color: var(--card-bg);
+  padding: 10px 12px;
+  border-radius: 4px;
+  border: 1px solid var(--border-color);
+  word-break: break-all;
+  font-size: 13px;
+  margin: 8px 0 16px 0;
+}
+
+.api-endpoint .btn-group {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.api-endpoint button {
+  flex: 1;
+  min-width: 100px;
+  height: 36px;
+  white-space: nowrap;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+}
+
+/* 分享选项样式 */
+.share-options {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  align-items: center;
+  padding: 16px 0;
+}
+
+.share-options input {
+  width: 100%;
+  padding: 12px;
+  background-color: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-family: 'Courier New', monospace;
+  font-size: 13px;
+  word-break: break-all;
+  resize: none;
+  min-height: 60px;
+  box-sizing: border-box;
+}
+
+.share-options button {
+  min-width: 120px;
+  height: 38px;
+  padding: 0 20px;
+  white-space: nowrap;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
 }
 
 .convert-options {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  padding: 16px 0;
 }
 
 .convert-options button {
   width: 100%;
-  padding: 10px;
+  height: 40px;
+  padding: 0 16px;
   text-align: center;
+  white-space: nowrap;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
 }
 
 #share-link {
   width: 100%;
-  padding: 8px;
-  margin-bottom: 10px;
-  background-color: var(--bg-secondary);
+  padding: 12px;
+  background-color: var(--bg-primary);
   color: var(--text-primary);
   border: 1px solid var(--border-color);
-  border-radius: 4px;
+  border-radius: 6px;
+  font-family: 'Courier New', monospace;
+  font-size: 13px;
+  word-break: break-all;
+  resize: none;
+  box-sizing: border-box;
 }
 
-/* 添加监控项目按钮样式 */
+/* 模态框统一按钮样式 */
+.modal-content .btn {
+  height: 36px;
+  min-height: 36px;
+  padding: 0 16px;
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  box-sizing: border-box;
+}
+
+.modal-content .btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.modal-content .btn.primary {
+  background: linear-gradient(to right, #8b5cf6, #6366f1);
+  color: white;
+}
+
+.modal-content .btn.primary:hover:not(:disabled) {
+  opacity: 0.9;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(139, 92, 246, 0.3);
+}
+
+.modal-content .btn.secondary {
+  background-color: var(--btn-hover);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+}
+
+.modal-content .btn.secondary:hover:not(:disabled) {
+  background-color: var(--card-bg);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+/* 模态框内错误提示样式 - 符合项目规范 */
+.modal-content .error-message {
+  color: var(--error-color);
+  font-size: 12px;
+  margin-top: 4px;
+  margin-bottom: 8px;
+  padding: 8px 12px;
+  background-color: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 4px;
+  display: none;
+}
+
+.modal-content .error-message.show {
+  display: block;
+}
+
+.modal-content .success-message {
+  color: var(--success-color);
+  font-size: 12px;
+  margin-top: 4px;
+  margin-bottom: 8px;
+  padding: 8px 12px;
+  background-color: rgba(34, 197, 94, 0.1);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  border-radius: 4px;
+  display: none;
+}
+
+.modal-content .success-message.show {
+  display: block;
+}
 .add-btn {
   background: linear-gradient(to right, #8b5cf6, #6366f1);
   color: white;
