@@ -20,20 +20,14 @@
     </div>
     
     <div class="toolbar">
-      <button id="format-btn" class="btn primary">格式化</button>
-      <button id="minify-btn" class="btn secondary">压缩</button>
-      <button id="fix-btn" class="btn secondary">修复</button>
-      <button id="copy-btn" class="btn secondary">复制</button>
-      <button id="download-btn" class="btn secondary">下载JSON</button>
-      <button id="convert-btn" class="btn secondary">格式转换</button>
-      <button id="share-btn" class="btn secondary">分享</button>
-      <button id="to-api-btn" class="btn secondary">转API</button>
-      
-      <!-- <div class="font-size-control">
-        <button id="font-decrease" class="btn icon">A-</button>
-        <span id="font-size-display">14px</span>
-        <button id="font-increase" class="btn icon">A+</button>
-      </div> -->
+      <button id="format-btn" class="btn primary" title="格式化JSON"><span class="icon-container"></span></button>
+      <button id="minify-btn" class="btn secondary" title="压缩JSON"><span class="icon-container"></span></button>
+      <button id="fix-btn" class="btn secondary" title="修复JSON"><span class="icon-container"></span></button>
+      <button id="copy-btn" class="btn secondary" title="复制到剪贴板"><span class="icon-container"></span></button>
+      <button id="download-btn" class="btn secondary" title="下载JSON文件"><span class="icon-container"></span></button>
+      <button id="convert-btn" class="btn secondary" title="格式转换"><span class="icon-container"></span></button>
+      <button id="share-btn" class="btn secondary" title="分享JSON"><span class="icon-container"></span></button>
+      <button id="to-api-btn" class="btn secondary" title="转为API服务"><span class="icon-container"></span></button>
     </div>
     
     <!-- 监控主题特有的添加按钮 -->
@@ -104,6 +98,7 @@
   <script src="src/js/api-handler.js"></script>
   <script src="src/js/line-numbers.js"></script>
   <script src="src/js/format-converter.js"></script>
+  <script src="src/js/icon-manager.js"></script>
   
   <!-- 主应用脚本 -->
   <script src="src/js/popup.js"></script>

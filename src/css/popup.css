@@ -86,40 +86,65 @@ body {
 .toolbar {
   background-color: var(--bg-secondary);
   border-bottom: 1px solid var(--border-color);
-  padding: 8px 16px;
+  padding: 12px;
   display: flex;
-  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: space-around;
+  gap: 12px;
   align-items: center;
 }
 
 .btn {
-  padding: 6px 12px;
+  padding: 10px;
   border: none;
-  border-radius: 4px;
+  border-radius: 8px;
   cursor: pointer;
-  font-size: 14px;
-  transition: background-color 0.2s;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  margin: 0 2px;
+}
+
+.icon-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  height: 100%;
+}
+
+.icon-container svg {
+  width: 22px;
+  height: 22px;
+}
+
+#format-btn .icon-container svg {
+  width: 24px;
+  height: 24px;
 }
 
 /* 格式化按钮特殊样式 */
 #format-btn {
   background: linear-gradient(to right, #8b5cf6, #6366f1);
   color: white;
-  border-radius: 6px;
-  padding: 8px 16px;
+  border-radius: 8px;
   font-weight: 500;
   border: none;
 }
 
 #format-btn:hover {
   opacity: 0.9;
+  transform: translateY(-2px);
 }
 
 .btn.primary {
   background: linear-gradient(to right, #8b5cf6, #6366f1);
   color: white;
-  border-radius: 6px;
-  padding: 8px 16px;
+  border-radius: 8px;
   font-weight: 500;
   border: none;
 }
@@ -128,16 +153,61 @@ body {
   background-color: transparent;
   color: var(--text-primary);
   border: none;
-  border-radius: 6px;
-  padding: 8px 16px;
+  border-radius: 8px;
 }
 
 .btn.primary:hover {
   opacity: 0.9;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
 }
 
 .btn.secondary:hover {
   background-color: var(--btn-hover);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+/* 添加工具提示样式 */
+.btn[title]:hover::after {
+  content: attr(title);
+  position: absolute;
+  top: -30px;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: rgba(0, 0, 0, 0.8);
+  color: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  white-space: nowrap;
+  z-index: 100;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  pointer-events: none;
+  opacity: 0;
+  animation: fadeIn 0.3s forwards;
+}
+
+@keyframes fadeIn {
+  to {
+    opacity: 1;
+  }
+}
+
+.btn {
+  position: relative;
+}
+
+.btn.secondary .icon-container svg {
+  color: var(--text-secondary);
+}
+
+.btn.secondary:hover .icon-container svg {
+  color: var(--text-primary);
+}
+
+.btn.primary .icon-container svg {
+  color: white;
 }
 
 .btn.icon {

@@ -25,12 +25,28 @@ async function initializeModules() {
     // 初始化字体大小
     await fontManager.initialize();
     
+    // 初始化图标
+    initializeIcons();
+    
     // 检查API服务器状态
     checkApiServerStatus();
   } catch (error) {
     console.error('初始化模块错误:', error);
     updateStatus('初始化失败，请重新加载', 'error');
   }
+}
+
+// 初始化图标
+function initializeIcons() {
+  // 设置按钮图标
+  document.querySelector('#format-btn .icon-container').innerHTML = IconManager.getIcon('format');
+  document.querySelector('#minify-btn .icon-container').innerHTML = IconManager.getIcon('minify');
+  document.querySelector('#fix-btn .icon-container').innerHTML = IconManager.getIcon('fix');
+  document.querySelector('#copy-btn .icon-container').innerHTML = IconManager.getIcon('copy');
+  document.querySelector('#download-btn .icon-container').innerHTML = IconManager.getIcon('download');
+  document.querySelector('#convert-btn .icon-container').innerHTML = IconManager.getIcon('convert');
+  document.querySelector('#share-btn .icon-container').innerHTML = IconManager.getIcon('share');
+  document.querySelector('#to-api-btn .icon-container').innerHTML = IconManager.getIcon('api');
 }
 
 // 设置事件监听器（使用性能优化）
