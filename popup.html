@@ -24,7 +24,7 @@
       <button id="save-btn" class="btn secondary" title="保存JSON数据"><span class="icon-container"></span></button>
       <button id="convert-btn" class="btn secondary" title="格式转换"><span class="icon-container"></span></button>
       <button id="share-btn" class="btn secondary" title="分享JSON"><span class="icon-container"></span></button>
-      <button id="to-api-btn" class="btn secondary" title="转为API服务"><span class="icon-container"></span></button>
+
     </div>
     
     <!-- 主要内容区域：左右布局 -->
@@ -34,6 +34,24 @@
         <div class="editor-container">
           <div class="line-numbers" id="line-numbers"></div>
           <textarea id="json-input" placeholder="在此粘贴JSON数据或者分享的数据地址..."></textarea>
+          
+          <!-- 空状态编辑器提示 -->
+          <div class="empty-editor-overlay" id="empty-editor-overlay">
+            <div class="empty-editor-message">
+              <div class="empty-editor-icon">💾</div>
+              <div class="empty-editor-title">请输入或粘贴JSON数据</div>
+              <div class="empty-editor-desc">您可以输入或粘贴JSON数据，也可以直接粘贴分享链接</div>
+              
+              <div class="empty-editor-tips">
+                <h4>快速操作提示：</h4>
+                <ul>
+                  <li>粘贴JSON数据后使用格式化功能</li>
+                  <li>粘贴分享链接自动导入JSON数据</li>
+                  <li>右侧历史面板可加载保存的数据</li>
+                </ul>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
       
@@ -58,51 +76,7 @@
       <span id="char-count">0 字符</span>
     </div>
     
-    <div id="api-modal" class="modal">
-      <div class="modal-content">
-        <span class="close-btn">&times;</span>
-        <h2>浏览器原生API服务</h2>
-        
-        <!-- 模态框内部提示区域 -->
-        <div id="api-modal-message" class="modal-message" style="display: none;"></div>
-        
-        <div class="api-info">
-          <p>API服务器状态: <span id="api-status">未启动</span></p>
-          <div class="api-controls">
-            <button id="start-api-btn" class="btn primary">启动API服务</button>
-            <button id="stop-api-btn" class="btn secondary" disabled>停止API服务</button>
-          </div>
-        </div>
-        
-        <div class="api-endpoint">
-          <p>服务类型:</p>
-          <span id="api-url">浏览器原生API (Service Worker)</span>
-          <div class="btn-group">
-            <button id="copy-api-url" class="btn secondary">复制使用说明</button>
-            <button id="open-api-docs" class="btn secondary">打开API文档</button>
-          </div>
-        </div>
-        
-        <!-- API调试工具区域 -->
-        <div class="api-debug-tools">
-          <h4>浏览器原生API调试</h4>
-          <div class="debug-btn-group">
-            <button id="test-api-connection" class="btn secondary small" onclick="testServiceWorkerApi()" title="测试Service Worker API连接">🔍 连接测试</button>
-            <button id="switch-api-provider" class="btn secondary small" onclick="switchToMemoryApi()" title="切换到备用API提供者">🔄 切换备用</button>
-            <button id="show-api-info" class="btn secondary small" onclick="showApiProviderInfo()" title="显示当前API提供者详细信息">📊 提供者信息</button>
-          </div>
-          <div class="api-help">
-            <p><strong>浏览器原生API特性：</strong></p>
-            <ul>
-              <li>零依赖启动，无需安装Python或Node.js</li>
-              <li>基于Service Worker，响应速度极快</li>
-              <li>内置缓存机制，提升性能</li>
-              <li>支持多提供者自动切换</li>
-            </ul>
-          </div>
-        </div>
-      </div>
-    </div>
+
     
     <div id="share-modal" class="modal">
       <div class="modal-content">
@@ -228,13 +202,7 @@
 
   <script src="src/js/performance-optimizer.js"></script>
   
-  <!-- 浏览器原生API服务模块 -->
-  <script src="src/js/browser-native-api.js"></script>
-  <script src="src/js/indexeddb-api-service.js"></script>
-  <script src="src/js/memory-api-service.js"></script>
-  <script src="src/js/unified-api-manager.js"></script>
-  
-  <script src="src/js/api-handler.js"></script>
+
   <script src="src/js/line-numbers.js"></script>
   <script src="src/js/format-converter.js"></script>
   <script src="src/js/icon-manager.js"></script>
@@ -247,10 +215,6 @@
   <!-- 主应用脚本 -->
   <script src="src/js/popup.js"></script>
   
-  <!-- 浏览器原生API适配补丁 -->
-  <script src="src/js/browser-native-api-patch.js"></script>
-  
-  <!-- Service Worker API专用工具 -->
-  <script src="src/js/service-worker-api-utils.js"></script>
+
 </body>
 </html>

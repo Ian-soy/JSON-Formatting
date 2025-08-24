@@ -197,8 +197,205 @@ body {
   position: relative;
 }
 
-.btn.secondary .icon-container svg {
+/* 状态栏样式优化 */
+.status-bar {
+  background-color: var(--bg-secondary);
+  padding: 10px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-top: 1px solid var(--border-color);
   color: var(--text-secondary);
+  font-size: 13px;
+  flex-shrink: 0;
+  position: relative;
+  overflow: hidden;
+  min-height: 38px;
+  box-shadow: 0 -1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.status-bar::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 2px;
+  width: 100%;
+  background: linear-gradient(to right, var(--success-color), var(--accent-color), var(--purple-color));
+  opacity: 0.6;
+}
+
+.status-bar #status-message {
+  transition: all 0.3s ease;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-weight: 500;
+  background: transparent;
+  color: var(--text-secondary);
+}
+
+.status-bar #status-message.warning {
+  background-color: rgba(245, 158, 11, 0.15);
+  color: var(--warning-color);
+}
+
+.status-bar #status-message.error {
+  background-color: rgba(239, 68, 68, 0.15);
+  color: var(--error-color);
+}
+
+.status-bar #status-message.success {
+  background-color: rgba(34, 197, 94, 0.15);
+  color: var(--success-color);
+}
+
+.status-bar #status-message.info {
+  background-color: rgba(59, 130, 246, 0.15);
+  color: var(--info-color);
+}
+
+/* 空状态编辑器提示样式 */
+.empty-editor-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  pointer-events: none;
+  z-index: 5;
+  background: rgba(23, 27, 46, 0.6);
+  backdrop-filter: blur(2px);
+  opacity: 0;
+  transition: opacity 0.5s ease;
+}
+
+.empty-editor-overlay.visible {
+  opacity: 1;
+}
+
+.empty-editor-message {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 20px 30px;
+  text-align: center;
+  max-width: 80%;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  animation: fadeInMessage 0.5s ease forwards;
+}
+
+@keyframes fadeInMessage {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.empty-editor-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+  color: var(--accent-color);
+  opacity: 0.8;
+}
+
+.empty-editor-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 12px;
+  color: var(--text-primary);
+  background: linear-gradient(to right, var(--accent-color), var(--purple-color));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.empty-editor-desc {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin-bottom: 20px;
+  line-height: 1.5;
+}
+
+.empty-editor-tips {
+  background: rgba(99, 102, 241, 0.1);
+  border-radius: 8px;
+  padding: 12px 16px;
+  text-align: left;
+  width: 100%;
+}
+
+.empty-editor-tips h4 {
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 8px;
+  color: var(--accent-color);
+}
+
+.empty-editor-tips ul {
+  list-style-type: none;
+  padding: 0;
+  margin: 0;
+}
+
+.empty-editor-tips li {
+  margin: 6px 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+}
+
+.empty-editor-tips li::before {
+  content: '•';
+  color: var(--accent-color);
+  font-weight: bold;
+  margin-right: 8px;
+}
+
+/* 禁用按钮样式 */
+.btn.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  position: relative;
+}
+
+.btn.disabled:hover {
+  background-color: transparent !important;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+.btn.disabled .icon-container svg {
+  color: var(--text-secondary) !important;
+}
+
+/* 禁用按钮的工具提示 */
+.btn.disabled[title]:hover::after {
+  content: attr(title);
+  position: absolute;
+  top: -40px;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: rgba(0, 0, 0, 0.85);
+  color: white;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  white-space: nowrap;
+  z-index: 100;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+  pointer-events: none;
+  opacity: 0;
+  width: max-content;
+  max-width: 220px;
+  animation: fadeIn 0.3s forwards;
 }
 
 .btn.secondary:hover .icon-container svg {
@@ -1143,91 +1340,11 @@ table tr:hover {
   border-color: var(--accent-color);
 }
 
-.api-info, .api-endpoint, .share-options, .convert-options {
+.share-options, .convert-options {
   margin-top: 20px;
 }
 
-.api-info p, .api-endpoint p {
-  margin-bottom: 12px;
-  color: var(--text-primary);
-  line-height: 1.5;
-  word-wrap: break-word;
-}
 
-/* API状态信息样式 */
-.api-info {
-  text-align: center;
-  padding: 16px 0;
-}
-
-.api-info p {
-  margin-bottom: 20px;
-  font-size: 14px;
-}
-
-.api-info button {
-  margin: 6px 8px;
-  min-width: 110px;
-  height: 38px;
-  white-space: nowrap;
-  font-size: 14px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 6px;
-}
-
-/* API接口地址样式 */
-.api-endpoint {
-  background-color: var(--bg-primary);
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-  padding: 16px;
-  margin-top: 20px;
-}
-
-.api-endpoint > p {
-  display: block;
-  margin-bottom: 12px;
-  font-size: 14px;
-  color: var(--text-primary);
-}
-
-.api-endpoint > p:first-child {
-  margin-bottom: 8px;
-}
-
-.api-endpoint #api-url {
-  display: block;
-  font-family: 'Courier New', monospace;
-  background-color: var(--card-bg);
-  padding: 10px 12px;
-  border-radius: 4px;
-  border: 1px solid var(--border-color);
-  word-break: break-all;
-  font-size: 13px;
-  margin: 8px 0 16px 0;
-}
-
-.api-endpoint .btn-group {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.api-endpoint button {
-  flex: 1;
-  min-width: 100px;
-  height: 36px;
-  white-space: nowrap;
-  font-size: 13px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 6px;
-}
-
-/* 分享选项样式 */
 .share-options {
   display: flex;
   flex-direction: column;
@@ -1693,118 +1810,3 @@ table tr:hover {
   animation: fadeOut 0.3s ease-out forwards;
 }
 
-/* API模态框增强样式 */
-.api-controls {
-  display: flex;
-  gap: 12px;
-  margin-top: 12px;
-  justify-content: center;
-}
-
-.api-debug-tools {
-  margin-top: 24px;
-  padding: 16px;
-  background-color: rgba(99, 102, 241, 0.05);
-  border-radius: 8px;
-  border: 1px solid rgba(99, 102, 241, 0.2);
-}
-
-.api-debug-tools h4 {
-  margin: 0 0 12px 0;
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--text-primary);
-}
-
-.debug-btn-group {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 12px;
-  flex-wrap: wrap;
-}
-
-.debug-btn-group .btn.small {
-  font-size: 12px;
-  padding: 6px 12px;
-  height: 32px;
-  min-width: auto;
-  white-space: nowrap;
-  /* 确保按钮文本正确编码和显示 */
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', system-ui, sans-serif !important;
-  direction: ltr;
-  unicode-bidi: normal;
-  text-align: center;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 120px;
-  line-height: 1.2;
-}
-
-.api-help {
-  margin-top: 12px;
-}
-
-.api-help p {
-  margin: 0 0 8px 0;
-  font-size: 13px;
-  color: var(--text-primary);
-}
-
-.api-help ul {
-  margin: 0;
-  padding-left: 16px;
-  color: var(--text-secondary);
-}
-
-.api-help li {
-  margin: 4px 0;
-  font-size: 12px;
-  line-height: 1.4;
-}
-
-.api-endpoint {
-  margin-top: 16px;
-}
-
-.api-endpoint p {
-  margin: 0 0 8px 0;
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--text-primary);
-}
-
-.api-endpoint #api-url {
-  display: block;
-  padding: 8px 12px;
-  background-color: var(--bg-primary);
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-  font-family: 'Courier New', monospace;
-  font-size: 13px;
-  color: var(--text-primary);
-  word-break: break-all;
-  margin-bottom: 12px;
-}
-
-/* 专门针对API调试按钮的文本修复 */
-#test-api-connection,
-#switch-api-provider,
-#show-api-info {
-  /* 强制重置按钮文本样式，防止字符编码问题 */
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', system-ui, sans-serif !important;
-  font-weight: 400 !important;
-  letter-spacing: 0 !important;
-  direction: ltr !important;
-  unicode-bidi: normal !important;
-  text-align: center !important;
-  word-break: keep-all !important;
-  overflow-wrap: normal !important;
-  text-transform: none !important;
-  /* 确保按钮文本不被截断 */
-  overflow: visible !important;
-  text-overflow: unset !important;
-  white-space: nowrap !important;
-}

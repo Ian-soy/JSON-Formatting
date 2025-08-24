@@ -1,8 +1,18 @@
 // 全局变量
-let apiRunning = false;
-let jsonData = {};
 let currentActiveHistoryItem = null;
 let historyManager = null;
+let isEmptyStateDisplayed = false; // 标记是否显示空状态
+
+// 工具栏按钮状态管理
+const TOOLBAR_BUTTONS = [
+  { id: 'format-btn', title: '格式化JSON' },
+  { id: 'minify-btn', title: '压缩JSON' },
+  { id: 'copy-btn', title: '复制到剪贴板' },
+  { id: 'download-btn', title: '下载JSON文件' },
+  { id: 'save-btn', title: '保存JSON数据' },
+  { id: 'convert-btn', title: '格式转换' },
+  { id: 'share-btn', title: '分享JSON' }
+];
 
 // DOM元素
 document.addEventListener('DOMContentLoaded', () => {
@@ -11,11 +21,12 @@ document.addEventListener('DOMContentLoaded', () => {
   setupEventListeners();
   updateCharCount();
   
-  // 延迟重置按钮文本，确保所有脚本加载后文本正确
+  // 初始化工具栏按钮状态和空状态覆盖层
   setTimeout(() => {
-    initializeApiDebugButtons();
-    console.log('🔄 延迟重置完成，确保按钮文本正确显示');
-  }, 1000);
+    // 使用setTimeout确保所有数据都已完全加载
+    updateToolbarButtonsState();
+    updateEmptyStateOverlay();
+  }, 100);
 });
 
 // 初始化所有模块
@@ -36,9 +47,6 @@ async function initializeModules() {
     // 初始化图标
     initializeIcons();
     
-    // 确保API调试按钮文本正确显示
-    initializeApiDebugButtons();
-    
     // 初始化数据管理器
     await dataManager.initialize();
     
@@ -48,12 +56,109 @@ async function initializeModules() {
     // 初始化历史数据管理器
     historyManager = new HistoryManager(dataManager);
     await historyManager.initialize();
-    
-    // 检查API服务器状态
-    checkApiServerStatus();
   } catch (error) {
     console.error('初始化模块错误:', error);
     updateStatus('初始化失败，请重新加载', 'error');
+  }
+}
+
+/**
+ * 检查是否有有效的JSON数据
+ * @returns {Object} { hasData: boolean, isEmpty: boolean, isValid: boolean, message: string }
+ */
+function checkJsonDataStatus() {
+  const input = document.getElementById('json-input');
+  const value = input.value.trim();
+  
+  // 检查是否为空
+  if (!value) {
+    return {
+      hasData: false,
+      isEmpty: true,
+      isValid: false,
+      message: '请先输入或粘贴JSON数据'
+    };
+  }
+  
+  // 检查JSON是否有效
+  const isValid = JsonUtils.isValid(value);
+  
+  if (!isValid) {
+    return {
+      hasData: true,
+      isEmpty: false,
+      isValid: false,
+      message: 'JSON数据格式无效，请检查后再试'
+    };
+  }
+  
+  return {
+    hasData: true,
+    isEmpty: false,
+    isValid: true,
+    message: '数据就绪'
+  };
+}
+
+/**
+ * 更新工具栏按钮状态
+ */
+function updateToolbarButtonsState() {
+  const status = checkJsonDataStatus();
+  const shouldEnable = status.hasData && status.isValid;
+  
+  TOOLBAR_BUTTONS.forEach(buttonConfig => {
+    const button = document.getElementById(buttonConfig.id);
+    if (button) {
+      if (shouldEnable) {
+        // 启用按钮
+        button.disabled = false;
+        button.classList.remove('disabled');
+        button.title = buttonConfig.title;
+      } else {
+        // 禁用按钮
+        button.disabled = true;
+        button.classList.add('disabled');
+        button.title = `${buttonConfig.title} - ${status.message}`;
+      }
+    }
+  });
+  
+  // 更新状态栏显示
+  if (!status.hasData || !status.isValid) {
+    // 只在没有数据或数据无效时显示提示
+    const statusElement = document.getElementById('status-message');
+    const currentStatus = statusElement.textContent;
+    // 只有当前状态是默认状态时才更新
+    if (currentStatus === '准备就绪' || currentStatus.includes('请先输入') || currentStatus.includes('格式无效')) {
+      updateStatus(status.message, status.isValid ? '' : 'warning');
+    }
+  }
+}
+
+/**
+ * 更新空状态覆盖层显示
+ */
+function updateEmptyStateOverlay() {
+  const input = document.getElementById('json-input');
+  const overlay = document.getElementById('empty-editor-overlay');
+  
+  if (!input || !overlay) return;
+  
+  const value = input.value.trim();
+  
+  // 如果输入框为空，显示覆盖层
+  if (!value) {
+    if (!isEmptyStateDisplayed) {
+      overlay.classList.add('visible');
+      isEmptyStateDisplayed = true;
+    }
+  } else {
+    // 如果输入框有内容，隐藏覆盖层
+    if (isEmptyStateDisplayed) {
+      overlay.classList.remove('visible');
+      isEmptyStateDisplayed = false;
+    }
   }
 }
 
@@ -67,7 +172,6 @@ function initializeIcons() {
   document.querySelector('#download-btn .icon-container').innerHTML = IconManager.getIcon('download');
   document.querySelector('#convert-btn .icon-container').innerHTML = IconManager.getIcon('convert');
   document.querySelector('#share-btn .icon-container').innerHTML = IconManager.getIcon('share');
-  document.querySelector('#to-api-btn .icon-container').innerHTML = IconManager.getIcon('api');
   
   // 新增按钮图标
   const saveBtn = document.querySelector('#save-btn .icon-container');
@@ -78,33 +182,6 @@ function initializeIcons() {
   
   const refreshBtn = document.querySelector('#refresh-history-btn .icon-container');
   if (refreshBtn) refreshBtn.innerHTML = IconManager.getIcon('refresh');
-}
-
-// 初始化API调试按钮，确保文本正确显示
-function initializeApiDebugButtons() {
-  console.log('🔧 初始化API调试按钮...');
-  
-  // 确保按钮存在并设置正确的文本
-  const testBtn = document.getElementById('test-api-connection');
-  if (testBtn) {
-    testBtn.textContent = '🔍 连接测试';
-    testBtn.title = '测试Service Worker API连接';
-    console.log('✅ 连接测试按钮文本已重置');
-  }
-  
-  const switchBtn = document.getElementById('switch-api-provider');
-  if (switchBtn) {
-    switchBtn.textContent = '🔄 切换备用';
-    switchBtn.title = '切换到备用API提供者';
-    console.log('✅ 切换备用按钮文本已重置');
-  }
-  
-  const infoBtn = document.getElementById('show-api-info');
-  if (infoBtn) {
-    infoBtn.textContent = '📊 提供者信息';
-    infoBtn.title = '显示当前API提供者详细信息';
-    console.log('✅ 提供者信息按钮文本已重置');
-  }
 }
 
 // 设置事件监听器（使用性能优化）
@@ -133,7 +210,6 @@ function setupEventListeners() {
   document.getElementById('download-btn').addEventListener('click', downloadJSON);
   document.getElementById('convert-btn').addEventListener('click', showConvertModal);
   document.getElementById('share-btn').addEventListener('click', showShareModal);
-  document.getElementById('to-api-btn').addEventListener('click', showApiModal);
 
   // 新增功能按钮
   document.getElementById('save-btn').addEventListener('click', showSaveModal);
@@ -145,6 +221,10 @@ function setupEventListeners() {
     performanceOptimizer.debounce(() => {
       updateCharCount();
       LineNumberManager.updateLineNumbersStatic();
+      // 更新工具栏按钮状态
+      updateToolbarButtonsState();
+      // 更新空状态覆盖层
+      updateEmptyStateOverlay();
     }, 300)
   );
   
@@ -163,12 +243,6 @@ function setupEventListeners() {
   // 格式转换模态框按钮
   document.getElementById('to-xml-btn').addEventListener('click', convertToXml);
   document.getElementById('to-csv-btn').addEventListener('click', convertToCsv);
-
-  // API模态框按钮
-  document.getElementById('start-api-btn').addEventListener('click', startApiServer);
-  document.getElementById('stop-api-btn').addEventListener('click', stopApiServer);
-  document.getElementById('copy-api-url').addEventListener('click', copyApiUrl);
-  document.getElementById('open-api-docs').addEventListener('click', openApiDocs);
 
   // 分享模态框按钮
   document.getElementById('copy-share-link').addEventListener('click', copyShareLink);
@@ -304,6 +378,10 @@ function processClipboardText(pastedText, originalEvent) {
         // 更新相关UI
         updateCharCount();
         LineNumberManager.updateLineNumbersStatic();
+        // 更新工具栏按钮状态
+        updateToolbarButtonsState();
+        // 更新空状态覆盖层
+        updateEmptyStateOverlay();
         
         // 显示成功提示，包含统计信息
         const stats = shareManager.getShareLinkStats(jsonData);
@@ -395,8 +473,15 @@ function updateCharCount() {
 
 // 格式化JSON（使用Web Worker处理大型JSON）
 function formatJSON() {
+  // 检查数据有效性
+  const dataStatus = checkJsonDataStatus();
+  if (!dataStatus.hasData || !dataStatus.isValid) {
+    updateStatus(dataStatus.message, dataStatus.isEmpty ? 'warning' : 'error');
+    return;
+  }
+  
   const input = document.getElementById('json-input');
-  const jsonString = input.value.trim() || '{}';
+  const jsonString = input.value.trim();
   
   // 检查是否为大型JSON
   if (performanceOptimizer.isLargeJson(jsonString)) {
@@ -451,8 +536,15 @@ function formatJSON() {
 
 // 压缩JSON
 function minifyJSON() {
+  // 检查数据有效性
+  const dataStatus = checkJsonDataStatus();
+  if (!dataStatus.hasData || !dataStatus.isValid) {
+    updateStatus(dataStatus.message, dataStatus.isEmpty ? 'warning' : 'error');
+    return;
+  }
+  
   const input = document.getElementById('json-input');
-  const jsonString = input.value.trim() || '{}';
+  const jsonString = input.value.trim();
   
   try {
     const result = JsonUtils.minify(jsonString);
@@ -477,6 +569,13 @@ function minifyJSON() {
 
 // 复制JSON（使用现代API）
 function copyJSON() {
+  // 检查数据有效性
+  const dataStatus = checkJsonDataStatus();
+  if (!dataStatus.hasData) {
+    updateStatus(dataStatus.message, 'warning');
+    return;
+  }
+  
   const input = document.getElementById('json-input');
   
   // 使用现代Clipboard API（如果可用）
@@ -509,9 +608,16 @@ function fallbackCopy(element) {
 
 // 显示分享模态框
 function showShareModal() {
+  // 检查数据有效性
+  const dataStatus = checkJsonDataStatus();
+  if (!dataStatus.hasData || !dataStatus.isValid) {
+    updateStatus(dataStatus.message, dataStatus.isEmpty ? 'warning' : 'error');
+    return;
+  }
+  
   const input = document.getElementById('json-input');
   try {
-    const jsonString = input.value.trim() || '{}';
+    const jsonString = input.value.trim();
     
     // 验证JSON是否有效
     if (!JsonUtils.isValid(jsonString)) {
@@ -769,570 +875,17 @@ async function copyShareLink() {
     showModalMessage('share-modal', '❌ 复制失败，请手动选择链接复制', 'error', 3000);
   }
 }
-
-// 显示API模态框
-function showApiModal() {
-  document.getElementById('api-modal').style.display = 'block';
-  // 立即检查服务器状态
-  checkApiServerStatus();
-  // 开始健康检查
-  if (apiHandler) {
-    apiHandler.startHealthCheck(10000); // 每10秒检查一次
-  }
-}
-
-// 检查API服务器状态（优化版）
-function checkApiServerStatus() {
-  chrome.runtime.sendMessage({
-    action: 'checkApiStatus'
-  }, (response) => {
-    if (response) {
-      apiRunning = response.running;
-      updateApiStatus();
-      
-      // 如果服务器运行中，尝试获取更详细信息
-      if (apiRunning && apiHandler) {
-        apiHandler.getServerInfo()
-          .then(info => {
-            console.log('API服务器信息:', info);
-          })
-          .catch(error => {
-            console.log('获取服务器信息失败:', error.message);
-          });
-      }
-    }
-  });
-}
-
-// 启动API服务器（智能引导版）
-function startApiServer() {
-  const input = document.getElementById('json-input');
-  
-  try {
-    const jsonString = input.value.trim() || '{"example": "data"}';
-    
-    // 验证JSON是否有效
-    if (!JsonUtils.isValid(jsonString)) {
-      showModalMessage('api-modal', '❌ 无效的JSON数据，已使用示例数据', 'warning', 3000);
-      input.value = JSON.stringify({"example": "data", "message": "这是示例数据"}, null, 2);
-    }
-    
-    const data = JSON.parse(input.value.trim());
-    
-    // 显示启动中状态
-    showModalMessage('api-modal', '🚀 正在初始化API服务器...', 'info', 0);
-    updateStatus('正在启动API服务器...', '');
-    
-    // 禁用启动按钮，防止重复点击
-    const startButton = document.getElementById('start-api-btn');
-    startButton.disabled = true;
-    
-    console.group('🚀 API服务器启动流程');
-    console.log('📊 JSON数据验证通过，大小:', JSON.stringify(data).length, '字符');
-    console.log('📝 数据预览:', JSON.stringify(data, null, 2).substring(0, 200) + '...');
-    
-    // 显示进度更新
-    setTimeout(() => {
-      showModalMessage('api-modal', '💾 正在生成Python服务器文件...', 'info', 0);
-    }, 500);
-    
-    // 发送消息给后台脚本启动API服务器
-    chrome.runtime.sendMessage({
-      action: 'startApiServer',
-      data: data
-    }, (response) => {
-      startButton.disabled = false;
-      console.groupEnd();
-      
-      console.log('📨 后台服务响应:', response);
-      
-      if (response && response.success) {
-        apiRunning = true;
-        updateApiStatus();
-        
-        // 显示成功提示和操作指导
-        const successMessage = `✅ Python文件已生成！\n\n📢 接下来需要手动启动：\n1. 打开终端/命令提示符\n2. 进入Downloads目录\n3. 执行: python json_api_server.py\n\n📖 详细步骤请查看控制台`;
-        showModalMessage('api-modal', successMessage, 'success', 10000);
-        updateStatus('Python文件已准备，请手动启动', 'success');
-        
-        console.group('📢 手动启动指导');
-        console.log('%c✅ Python文件已下载到Downloads目录', 'color: green; font-weight: bold');
-        console.log('%c📝 请按以下步骤手动启动：', 'color: blue; font-weight: bold');
-        console.log('1️⃣ 打开终端（Windows: Win+R 输入cmd，Mac: 按Cmd+Space 输入Terminal）');
-        console.log('2️⃣ 进入下载目录：');
-        console.log('   Windows: cd %USERPROFILE%\\Downloads');
-        console.log('   Mac/Linux: cd ~/Downloads');
-        console.log('3️⃣ 启动服务：');
-        console.log('   python json_api_server.py');
-        console.log('   或 python3 json_api_server.py');
-        console.log('4️⃣ 看到启动信息后，回到扩展界面点击“打开API文档”');
-        console.log('%c🔗 服务启动后可访问: http://localhost:8000/docs', 'color: purple; font-weight: bold');
-        console.groupEnd();
-        
-        // 开始健康检查
-        if (apiHandler) {
-          apiHandler.startHealthCheck(5000); // 每5秒检查一次
-        }
-        
-        // 启动后立即开始检查服务器状态
-        const checkServerInterval = setInterval(() => {
-          if (apiHandler) {
-            apiHandler.checkServerStatus()
-              .then(isRunning => {
-                if (isRunning) {
-                  clearInterval(checkServerInterval);
-                  apiRunning = true;
-                  updateApiStatus();
-                  showModalMessage('api-modal', '🎉 API服务器连接成功！可以开始调试了', 'success', 5000);
-                  updateStatus('API服务器已连接', 'success');
-                  
-                  // 获取服务器信息
-                  apiHandler.getServerInfo()
-                    .then(info => {
-                      console.log('📋 API服务器信息:', info);
-                    })
-                    .catch(error => {
-                      console.log('⚠️ 获取服务器信息失败:', error.message);
-                    });
-                }
-              })
-              .catch(error => {
-                console.log('🔍 等待服务器启动...');
-              });
-          }
-        }, 3000); // 每3秒检查一次
-        
-        // 30秒后停止自动检查
-        setTimeout(() => {
-          clearInterval(checkServerInterval);
-        }, 30000);
-        
-      } else {
-        const errorMsg = response?.error || '未知错误';
-        console.error('❌ API服务器启动失败:', errorMsg);
-        
-        // 根据错误类型提供具体的解决建议
-        let detailedMessage = `❌ 启动失败: ${errorMsg}`;
-        let suggestions = [];
-        
-        if (errorMsg.includes('downloads') || errorMsg.includes('权限')) {
-          suggestions.push('请重新加载扩展（chrome://extensions/）');
-          suggestions.push('确保扩展处于启用状态');
-        } else if (errorMsg.includes('下载')) {
-          suggestions.push('检查浏览器下载设置');
-          suggestions.push('确保Downloads文件夹可写');
-        } else if (errorMsg.includes('超时')) {
-          suggestions.push('检查网络连接');
-          suggestions.push('关闭杀毒软件后重试');
-        }
-        
-        if (suggestions.length > 0) {
-          detailedMessage += `\n\n💡 建议解决方案:\n${suggestions.map((s, i) => `${i + 1}. ${s}`).join('\n')}`;
-        }
-        
-        detailedMessage += '\n\n📖 完整指南请查看 API_STARTUP_HELPER.md';
-        
-        // 在控制台输出详细的调试信息
-        console.group('🔧 API启动失败调试信息');
-        console.error('❌ 错误详情:', errorMsg);
-        console.log('💡 建议操作:');
-        console.log('1. 重新加载扩展: chrome://extensions/ -> 找到JSON格式化大师 -> 点击重新加载');
-        console.log('2. 检查Python环境: python --version');
-        console.log('3. 安装依赖: pip install fastapi uvicorn');
-        console.log('4. 检查端口占用: netstat -ano | findstr :8000');
-        console.log('5. 查看完整指南: 项目目录下的 API_STARTUP_HELPER.md');
-        console.groupEnd();
-        
-        showModalMessage('api-modal', detailedMessage, 'error', 12000);
-        updateStatus(`启动失败: ${errorMsg}`, 'error');
-      }
-    });
-    
-  } catch (error) {
-    console.error('🚨 启动过程异常:', error);
-    showModalMessage('api-modal', `❌ 初始化失败: ${error.message}`, 'error', 5000);
-    updateStatus(`初始化错误: ${error.message}`, 'error');
-  }
-}
-
-// 停止API服务器（增强版）
-function stopApiServer() {
-  // 显示停止中状态
-  showModalMessage('api-modal', '🛑 正在停止API服务器...', 'info', 0);
-  updateStatus('正在停止API服务器...', '');
-  
-  // 禁用停止按钮
-  const stopButton = document.getElementById('stop-api-btn');
-  stopButton.disabled = true;
-  
-  // 停止健康检查
-  if (apiHandler) {
-    apiHandler.stopHealthCheck();
-  }
-  
-  chrome.runtime.sendMessage({
-    action: 'stopApiServer'
-  }, (response) => {
-    stopButton.disabled = false;
-    
-    if (response && response.success) {
-      apiRunning = false;
-      updateApiStatus();
-      
-      // 显示成功提示
-      showModalMessage('api-modal', '✅ API服务器已停止', 'success', 2000);
-      updateStatus('API服务器已停止', 'success');
-    } else {
-      const errorMsg = response?.error || '未知错误';
-      showModalMessage('api-modal', `❌ 停止失败: ${errorMsg}`, 'error', 3000);
-      updateStatus(`API服务器停止失败: ${errorMsg}`, 'error');
-    }
-  });
-}
-
-// 更新API状态（增强版）
-function updateApiStatus() {
-  const statusElement = document.getElementById('api-status');
-  const startButton = document.getElementById('start-api-btn');
-  const stopButton = document.getElementById('stop-api-btn');
-  
-  if (apiRunning) {
-    statusElement.textContent = '运行中';
-    statusElement.className = 'success';
-    startButton.disabled = true;
-    stopButton.disabled = false;
-    
-    // 更新API地址显示
-    const apiUrl = document.getElementById('api-url');
-    if (apiUrl) {
-      apiUrl.textContent = 'http://localhost:8000/json-data';
-    }
-  } else {
-    statusElement.textContent = '未启动';
-    statusElement.className = '';
-    startButton.disabled = false;
-    stopButton.disabled = true;
-  }
-}
-
-// 复制API地址（新增）
-async function copyApiUrl() {
-  const apiUrl = 'http://localhost:8000/json-data';
-  
-  try {
-    // 使用现代Clipboard API
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      await navigator.clipboard.writeText(apiUrl);
-      showModalMessage('api-modal', '✅ API地址已复制到剪贴板', 'success', 2000);
-    } else {
-      // 回退到传统方法
-      const textArea = document.createElement('textarea');
-      textArea.value = apiUrl;
-      document.body.appendChild(textArea);
-      textArea.select();
-      const success = document.execCommand('copy');
-      document.body.removeChild(textArea);
-      
-      if (success) {
-        showModalMessage('api-modal', '✅ API地址已复制到剪贴板', 'success', 2000);
-      } else {
-        throw new Error('复制操作失败');
-      }
-    }
-  } catch (error) {
-    console.error('复制API地址错误:', error);
-    showModalMessage('api-modal', '❌ 复制失败，请手动选择地址复制', 'error', 3000);
-  }
-}
-
-// 打开API文档（新增）
-function openApiDocs() {
-  try {
-    // 显示浏览器原生API文档
-    const docContent = `
-【浏览器原生API文档】
-
-🚀 当前服务: ${apiRunning ? '已启动' : '未启动'}
-
-📋 可用端点:
-• GET  /health      - 健康检查
-• GET  /info        - 服务器信息 
-• GET  /stats       - 统计信息
-• GET  /json-data   - 获取JSON数据
-• POST /json-data   - 更新JSON数据
-• POST /validate    - 验证JSON
-• POST /format      - 格式化JSON
-• POST /minify      - 压缩JSON
-• POST /reset       - 重置数据
-• POST /shutdown    - 关闭服务
-
-🔧 调试工具:
-• testServiceWorkerApi() - 连接测试
-• switchToMemoryApi() - 切换备用提供者
-• showApiProviderInfo() - 提供者信息
-• optimizeServiceWorkerPerformance() - 性能优化
-
-💡 使用方式:
-1. 在控制台输入函数名即可调用
-2. 使用统一API管理器: unifiedApiManager.get('/health')
-3. 支持多提供者自动切换`;
-    
-    // 在新窗口中显示文档
-    const docWindow = window.open('', '_blank', 'width=600,height=400,scrollbars=yes');
-    if (docWindow) {
-      docWindow.document.write(`
-        <html>
-          <head>
-            <title>浏览器原生API文档</title>
-            <style>
-              body { font-family: monospace; padding: 20px; background: #1a1a1a; color: #e0e0e0; }
-              pre { white-space: pre-wrap; line-height: 1.5; }
-            </style>
-          </head>
-          <body>
-            <pre>${docContent}</pre>
-          </body>
-        </html>
-      `);
-      docWindow.document.close();
-      showModalMessage('api-modal', '✅ 浏览器原生API文档已打开', 'success', 2000);
-    } else {
-      // 如果弹窗被阻止，将文档内容复制到剪贴板
-      navigator.clipboard.writeText(docContent).then(() => {
-        showModalMessage('api-modal', '📋 API文档已复制到剪贴板', 'success', 3000);
-      }).catch(() => {
-        console.log(docContent);
-        showModalMessage('api-modal', '📖 API文档已输出到控制台', 'info', 3000);
-      });
-    }
-  } catch (error) {
-    console.error('显示API文档错误:', error);
-    showModalMessage('api-modal', '❌ 无法显示文档，请查看控制台或使用调试工具', 'error', 3000);
-  }
-}
-function showApiModal() {
-  document.getElementById('api-modal').style.display = 'block';
-  updateApiStatus();
-}
-
-// 启动API服务器
-function startApiServer() {
-  const input = document.getElementById('json-input');
-  try {
-    const data = JSON.parse(input.value.trim() || '{}');
-    jsonData = data;
-    
-    // 发送消息给后台脚本启动API服务器
-    chrome.runtime.sendMessage({
-      action: 'startApiServer',
-      data: jsonData
-    }, (response) => {
-      if (response && response.success) {
-        apiRunning = true;
-        updateApiStatus();
-        updateStatus('API服务器已启动', 'success');
-      } else {
-        updateStatus(`API服务器启动失败: ${response.error || '未知错误'}`, 'error');
-      }
-    });
-  } catch (error) {
-    updateStatus(`API错误: ${error.message}`, 'error');
-  }
-}
-
-// 停止API服务器
-function stopApiServer() {
-  chrome.runtime.sendMessage({
-    action: 'stopApiServer'
-  }, (response) => {
-    if (response && response.success) {
-      apiRunning = false;
-      updateApiStatus();
-      updateStatus('API服务器已停止', 'success');
-    } else {
-      updateStatus(`API服务器停止失败: ${response.error || '未知错误'}`, 'error');
-    }
-  });
-}
-
-// 更新API状态
-function updateApiStatus() {
-  const statusElement = document.getElementById('api-status');
-  const startButton = document.getElementById('start-api-btn');
-  const stopButton = document.getElementById('stop-api-btn');
-  
-  if (apiRunning) {
-    statusElement.textContent = '运行中';
-    statusElement.className = 'success';
-    startButton.disabled = true;
-    stopButton.disabled = false;
-  } else {
-    statusElement.textContent = '未启动';
-    statusElement.className = '';
-    startButton.disabled = false;
-    stopButton.disabled = true;
-  }
-}
-
-// 复制API URL
-function copyApiUrl() {
-  // 生成浏览器原生API使用说明
-  const apiUsageInfo = `
-浏览器原生API使用说明:
-
-1. 直接在控制台使用:
-   - unifiedApiManager.get('/health')        // 健康检查
-   - unifiedApiManager.get('/json-data')     // 获取数据
-   - unifiedApiManager.post('/json-data', {data: yourData}) // 更新数据
-
-2. 快速调试工具:
-   - testServiceWorkerApi()                  // 连接测试
-   - optimizeServiceWorkerPerformance()      // 性能优化
-   - showApiProviderInfo()                   // 提供者信息
-
-3. 提供者切换:
-   - unifiedApiManager.switchProvider('memory')     // 内存提供者
-   - unifiedApiManager.switchProvider('indexeddb')  // 持久化提供者
-   - unifiedApiManager.switchProvider('browser-native') // Service Worker
-
-📝 无需安装任何环境，完全基于浏览器原生能力！
-`;
-  
-  // 使用现代Clipboard API（如果可用）
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(apiUsageInfo)
-      .then(() => {
-        // 在API模态框内显示成功提示
-        showModalMessage('api-modal', '✅ 浏览器原生API使用说明已复制到剪贴板', 'success', 3000);
-      })
-      .catch(error => {
-        console.error('复制失败:', error);
-        // 输出到控制台作为备用
-        console.log(apiUsageInfo);
-        showModalMessage('api-modal', '📋 使用说明已输出到控制台，请查看Console', 'info', 3000);
-      });
-  } else {
-    // 输出到控制台作为备用
-    console.log(apiUsageInfo);
-    showModalMessage('api-modal', '📋 使用说明已输出到控制台，请查看Console', 'info', 3000);
-  }
-}
-
-// API性能测试和诊断功能
-function testApiPerformance() {
-  if (!apiRunning) {
-    showModalMessage('api-modal', '⚠️ API服务器未启动', 'warning', 3000);
-    return;
-  }
-  
-  showModalMessage('api-modal', '🔍 正在测试API性能...', 'info', 0);
-  
-  if (apiHandler) {
-    // 执行连接测试
-    apiHandler.testConnection()
-      .then(result => {
-        if (result.success) {
-          const latency = result.latency;
-          let performanceLevel = 'success';
-          let performanceText = '优秀';
-          
-          if (latency > 1000) {
-            performanceLevel = 'error';
-            performanceText = '较慢';
-          } else if (latency > 500) {
-            performanceLevel = 'warning';
-            performanceText = '一般';
-          }
-          
-          showModalMessage('api-modal', 
-            `✅ API性能测试完成\n响应时间: ${latency}ms (${performanceText})`, 
-            performanceLevel, 4000);
-            
-          // 获取统计信息
-          return apiHandler.getStats();
-        } else {
-          throw new Error(result.error || '连接测试失败');
-        }
-      })
-      .then(stats => {
-        console.log('API服务器统计:', stats);
-      })
-      .catch(error => {
-        showModalMessage('api-modal', `❌ 性能测试失败: ${error.message}`, 'error', 3000);
-      });
-  }
-}
-
-// 添加API调试工具函数
-function debugApiConnection() {
-  if (!apiHandler) {
-    console.error('apiHandler 未初始化');
-    return;
-  }
-  
-  console.group('🔧 API调试信息');
-  
-  // 检查服务器状态
-  apiHandler.checkServerStatus()
-    .then(isRunning => {
-      console.log('服务器运行状态:', isRunning ? '✅ 运行中' : '❌ 未运行');
-      
-      if (isRunning) {
-        // 获取服务器信息
-        return apiHandler.getServerInfo();
-      }
-      return null;
-    })
-    .then(info => {
-      if (info) {
-        console.log('服务器信息:', info);
-        return apiHandler.getStats();
-      }
-      return null;
-    })
-    .then(stats => {
-      if (stats) {
-        console.log('统计信息:', stats);
-      }
-    })
-    .catch(error => {
-      console.error('调试信息获取失败:', error);
-    })
-    .finally(() => {
-      console.groupEnd();
-    });
-}
-
-// 在模态框关闭时清理资源
-function onApiModalClose() {
-  if (apiHandler) {
-    apiHandler.stopHealthCheck();
-  }
-}
-
-// 修改模态框关闭事件监听器
-document.addEventListener('DOMContentLoaded', () => {
-  // ... 其他初始化代码 ...
-  
-  // 添加模态框关闭事件
-  const apiModal = document.getElementById('api-modal');
-  if (apiModal) {
-    apiModal.addEventListener('click', (e) => {
-      if (e.target === apiModal || e.target.classList.contains('close-btn')) {
-        onApiModalClose();
-      }
-    });
-  }
-});
-
-// 将调试函数添加到全局作用域，便于在控制台中调用
-if (typeof window !== 'undefined') {
-  window.testApiPerformance = testApiPerformance;
-  window.debugApiConnection = debugApiConnection;
-}
+// 下载JSON文件
 
 // 下载JSON文件
 function downloadJSON() {
+  // 检查数据有效性
+  const dataStatus = checkJsonDataStatus();
+  if (!dataStatus.hasData || !dataStatus.isValid) {
+    updateStatus(dataStatus.message, dataStatus.isEmpty ? 'warning' : 'error');
+    return;
+  }
+  
   const input = document.getElementById('json-input');
   try {
     const jsonString = input.value.trim();
@@ -1354,11 +907,25 @@ function downloadJSON() {
 
 // 显示格式转换模态框
 function showConvertModal() {
+  // 检查数据有效性
+  const dataStatus = checkJsonDataStatus();
+  if (!dataStatus.hasData || !dataStatus.isValid) {
+    updateStatus(dataStatus.message, dataStatus.isEmpty ? 'warning' : 'error');
+    return;
+  }
+  
   document.getElementById('convert-modal').style.display = 'block';
 }
 
 // 转换为XML
 function convertToXml() {
+  // 检查数据有效性
+  const dataStatus = checkJsonDataStatus();
+  if (!dataStatus.hasData || !dataStatus.isValid) {
+    updateStatus(dataStatus.message, dataStatus.isEmpty ? 'warning' : 'error');
+    return;
+  }
+  
   const input = document.getElementById('json-input');
   try {
     const jsonString = input.value.trim();
@@ -1383,6 +950,13 @@ function convertToXml() {
 
 // 转换为CSV
 function convertToCsv() {
+  // 检查数据有效性
+  const dataStatus = checkJsonDataStatus();
+  if (!dataStatus.hasData || !dataStatus.isValid) {
+    updateStatus(dataStatus.message, dataStatus.isEmpty ? 'warning' : 'error');
+    return;
+  }
+  
   const input = document.getElementById('json-input');
   try {
     const jsonString = input.value.trim();
@@ -1422,20 +996,15 @@ const updateStatus = performanceOptimizer.debounce((message, type = '') => {
 
 // 显示保存模态框
 function showSaveModal() {
+  // 检查数据有效性
+  const dataStatus = checkJsonDataStatus();
+  if (!dataStatus.hasData || !dataStatus.isValid) {
+    updateStatus(dataStatus.message, dataStatus.isEmpty ? 'warning' : 'error');
+    return;
+  }
+  
   const input = document.getElementById('json-input');
   const jsonString = input.value.trim();
-  
-  if (!jsonString) {
-    updateStatus('没有JSON数据可保存', 'error');
-    return;
-  }
-  
-  // 验证JSON格式
-  const validation = dataManager.validateJson(jsonString);
-  if (!validation.valid) {
-    updateStatus('无效的JSON格式，无法保存', 'error');
-    return;
-  }
   
   // 清空输入框和错误信息
   const saveTitleInput = document.getElementById('save-title-input');
