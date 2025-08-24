@@ -21,7 +21,8 @@
     "storage",
     "clipboardWrite",
     "clipboardRead",
-    "scripting"
+    "scripting",
+    "downloads"
   ],
   "host_permissions": [
     "http://localhost/*"

@@ -1,250 +1,311 @@
+/**
+ * JSON格式化大师 - Background Service Worker
+ * 使用浏览器原生API服务，无需外部依赖
+ */
+
+// 导入浏览器原生API服务
+importScripts(
+  'browser-native-api.js',
+  'indexeddb-api-service.js', 
+  'memory-api-service.js',
+  'unified-api-manager.js'
+);
+
 // 全局变量
-let pythonProcess = null;
 let apiServerRunning = false;
 let currentJsonData = {};
 
+// 初始化统一API管理器
+const apiManager = new UnifiedApiManager();
+
 // 监听来自popup的消息
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  console.log('📨 后台服务收到消息:', request.action);
+  
   if (request.action === 'startApiServer') {
-    debugger;
-    startApiServer(request.data, sendResponse);
+    startBrowserNativeApiServer(request.data, sendResponse);
     return true; // 保持消息通道开放，以便异步响应
   } else if (request.action === 'stopApiServer') {
-    stopApiServer(sendResponse);
+    stopBrowserNativeApiServer(sendResponse);
     return true; // 保持消息通道开放，以便异步响应
   } else if (request.action === 'checkApiStatus') {
-    sendResponse({ running: apiServerRunning });
+    checkBrowserNativeApiStatus(sendResponse);
+    return true;
+  } else if (request.action === 'switchApiProvider') {
+    switchApiProvider(request.provider, sendResponse);
+    return true;
+  } else if (request.action === 'getApiProviders') {
+    getAvailableApiProviders(sendResponse);
     return false;
+  } else if (request.action === 'performanceTest') {
+    performApiPerformanceTest(request.iterations || 10, sendResponse);
+    return true;
   }
 });
 
-// 启动API服务器
-function startApiServer(jsonData, sendResponse) {
+/**
+ * 启动浏览器原生API服务器
+ */
+async function startBrowserNativeApiServer(jsonData, sendResponse) {
+  console.log('🚀 启动浏览器原生API服务器...');
+  console.log('📊 JSON数据大小:', JSON.stringify(jsonData || {}).length, '字符');
+  
   if (apiServerRunning) {
-    sendResponse({ success: true, message: 'API服务器已经在运行' });
+    console.log('⚠️ API服务器已在运行');
+    sendResponse({ 
+      success: true, 
+      message: 'API服务器已经在运行',
+      provider: apiManager.getCurrentProviderInfo()?.type || 'unknown'
+    });
     return;
   }
 
-  currentJsonData = jsonData;
-  
-  // 创建临时Python文件
-  createPythonApiServer()
-    .then(() => {
-      // 使用fetch API检查服务器是否已启动
-      return checkServerStatus();
-    })
-    .then(isRunning => {
-      if (isRunning) {
-        apiServerRunning = true;
-        sendResponse({ success: true });
-      } else {
-        sendResponse({ success: false, error: '服务器启动失败' });
-      }
-    })
-    .catch(error => {
-      sendResponse({ success: false, error: error.message });
+  try {
+    // 验证JSON数据
+    if (jsonData && typeof jsonData !== 'object') {
+      throw new Error('无效的JSON数据格式');
+    }
+    
+    currentJsonData = jsonData || {};
+    console.log('✅ JSON数据验证通过');
+
+    // 启动API服务
+    const result = await apiManager.startApiService(currentJsonData);
+    
+    if (result.success) {
+      apiServerRunning = true;
+      console.log('🎉 浏览器原生API服务器启动成功！');
+      console.log('🔧 使用提供者:', result.provider_name);
+      
+      sendResponse({ 
+        success: true, 
+        message: `${result.provider_name}启动成功`,
+        provider: result.provider,
+        provider_name: result.provider_name,
+        server_type: 'Browser Native'
+      });
+    } else {
+      throw new Error(result.message || '启动失败');
+    }
+    
+  } catch (error) {
+    console.error('❌ API服务器启动失败:', error);
+    sendResponse({ 
+      success: false, 
+      error: `浏览器原生API服务启动失败: ${error.message}`,
+      suggestion: '请检查浏览器环境和扩展权限'
     });
+  }
 }
 
-// 停止API服务器
-function stopApiServer(sendResponse) {
+/**
+ * 停止浏览器原生API服务器
+ */
+async function stopBrowserNativeApiServer(sendResponse) {
+  console.log('🛑 停止浏览器原生API服务器...');
+  
   if (!apiServerRunning) {
     sendResponse({ success: true, message: 'API服务器未运行' });
     return;
   }
 
-  // 发送请求停止服务器
-  fetch('http://localhost:8000/shutdown', { method: 'POST' })
-    .then(response => {
-      if (response.ok) {
-        apiServerRunning = false;
-        sendResponse({ success: true });
-      } else {
-        throw new Error('服务器停止失败');
-      }
-    })
-    .catch(error => {
-      console.error('API服务器停止错误:', error);
-      // 如果无法通过API停止，尝试强制关闭
-      apiServerRunning = false;
-      sendResponse({ success: true, message: '服务器已强制停止' });
+  try {
+    const result = await apiManager.stopApiService();
+    apiServerRunning = false;
+    
+    console.log('✅ API服务器已停止');
+    sendResponse({ 
+      success: true, 
+      message: 'API服务器已停止',
+      result: result
     });
-}
-
-// 创建Python API服务器文件
-function createPythonApiServer() {
-  return new Promise((resolve, reject) => {
-    // 使用chrome.downloads API下载Python文件
-    const pythonCode = `
-      import json
-      import uvicorn
-      import threading
-      from fastapi import FastAPI, HTTPException
-      from fastapi.middleware.cors import CORSMiddleware
-      from pydantic import BaseModel
-      from typing import Dict, Any
-
-      # 创建FastAPI应用
-      app = FastAPI(
-          title="JSON Master API",
-          description="由JSON格式化大师提供的API服务",
-          version="1.0.0"
-      )
-
-      # 添加CORS中间件
-      app.add_middleware(
-          CORSMiddleware,
-          allow_origins=["*"],
-          allow_credentials=True,
-          allow_methods=["*"],
-          allow_headers=["*"],
-      )
-
-      # 存储当前JSON数据
-      current_json_data = {}
-
-      # 数据模型
-      class JsonData(BaseModel):
-          data: Dict[str, Any]
-
-      # 获取JSON数据
-      @app.get("/json-data")
-      async def get_json_data():
-          return current_json_data
-
-      # 更新JSON数据
-      @app.post("/json-data")
-      async def update_json_data(json_data: JsonData):
-          global current_json_data
-          current_json_data = json_data.data
-          return {"status": "success", "message": "JSON数据已更新"}
-
-      # 关闭服务器
-      @app.post("/shutdown")
-      async def shutdown():
-          # 在单独的线程中关闭服务器
-          def stop_server():
-              uvicorn.Server.should_exit = True
-          
-          threading.Thread(target=stop_server).start()
-          return {"status": "success", "message": "服务器正在关闭"}
-
-      # 初始化JSON数据
-      def init_json_data(data):
-          global current_json_data
-          current_json_data = data
-
-      # 启动服务器
-      def start_server(json_data=None):
-          if json_data:
-              init_json_data(json_data)
-          
-          uvicorn.run(app, host="127.0.0.1", port=8000)
-
-      if __name__ == "__main__":
-          # 从命令行参数获取JSON数据
-          import sys
-          if len(sys.argv) > 1:
-              try:
-                  data = json.loads(sys.argv[1])
-                  start_server(data)
-              except json.JSONDecodeError:
-                  print("无效的JSON数据")
-                  start_server({})
-          else:
-              start_server({})
-      `;
-
-    // 使用Blob和URL创建一个可下载的链接
-    const blob = new Blob([pythonCode], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    
-    // 创建下载链接
-    chrome.downloads.download({
-      url: url,
-      filename: 'json_api_server.py',
-      saveAs: false
-    }, downloadId => {
-      if (chrome.runtime.lastError) {
-        reject(new Error(chrome.runtime.lastError.message));
-      } else {
-        // 监听下载完成
-        chrome.downloads.onChanged.addListener(function downloadListener(delta) {
-          if (delta.id === downloadId && delta.state && delta.state.current === 'complete') {
-            chrome.downloads.onChanged.removeListener(downloadListener);
-            
-            // 获取下载项信息
-            chrome.downloads.search({ id: downloadId }, function(items) {
-              if (items && items.length > 0) {
-                const filePath = items[0].filename;
-                
-                // 启动Python进程
-                startPythonProcess(filePath, JSON.stringify(currentJsonData))
-                  .then(resolve)
-                  .catch(reject);
-              } else {
-                reject(new Error('无法获取下载文件信息'));
-              }
-            });
-          }
-        });
-      }
+  } catch (error) {
+    console.error('❌ API服务器停止失败:', error);
+    // 强制停止
+    apiServerRunning = false;
+    sendResponse({ 
+      success: true, 
+      message: '服务器已强制停止',
+      warning: error.message
     });
-  });
+  }
 }
 
-// 启动Python进程
-function startPythonProcess(scriptPath, jsonData) {
-  return new Promise((resolve, reject) => {
-    // 使用chrome.runtime.sendNativeMessage与本地Python解释器通信
-    // 注意：这需要设置本地主机应用程序
-    // 由于浏览器扩展的限制，我们使用一个模拟实现
-    
-    // 模拟启动Python进程
-    console.log(`模拟启动Python进程: python ${scriptPath} '${jsonData}'`);
-    
-    // 等待一段时间，模拟服务器启动
-    setTimeout(() => {
-      // 检查服务器是否已启动
-      checkServerStatus()
-        .then(isRunning => {
-          if (isRunning) {
-            resolve();
-          } else {
-            reject(new Error('无法启动Python服务器'));
-          }
-        })
-        .catch(reject);
-    }, 1000);
-  });
-}
-
-// 检查服务器状态
-function checkServerStatus() {
-  return new Promise((resolve) => {
-    fetch('http://localhost:8000/json-data')
-      .then(response => {
-        if (response.ok) {
-          resolve(true);
-        } else {
-          resolve(false);
-        }
-      })
-      .catch(() => {
-        resolve(false);
+/**
+ * 检查浏览器原生API状态
+ */
+async function checkBrowserNativeApiStatus(sendResponse) {
+  try {
+    if (!apiServerRunning) {
+      sendResponse({ 
+        running: false,
+        provider: null
       });
+      return;
+    }
+
+    const health = await apiManager.checkHealth();
+    const providerInfo = apiManager.getCurrentProviderInfo();
+    
+    sendResponse({ 
+      running: health.healthy,
+      provider: providerInfo?.type,
+      provider_name: providerInfo?.name,
+      response_time: health.response_time,
+      uptime: providerInfo?.status?.uptime || 0,
+      requests_count: providerInfo?.status?.requests_count || 0
+    });
+  } catch (error) {
+    console.error('❌ 检查API状态失败:', error);
+    sendResponse({ 
+      running: false,
+      error: error.message
+    });
+  }
+}
+
+/**
+ * 切换API提供者
+ */
+async function switchApiProvider(providerType, sendResponse) {
+  console.log('🔄 切换API提供者到:', providerType);
+  
+  try {
+    const result = await apiManager.switchProvider(providerType);
+    
+    console.log('✅ API提供者切换成功:', result.provider);
+    sendResponse({
+      success: true,
+      provider: result.provider,
+      data_restored: result.data_restored,
+      message: `已切换到${result.provider}提供者`
+    });
+  } catch (error) {
+    console.error('❌ 切换API提供者失败:', error);
+    sendResponse({
+      success: false,
+      error: `切换失败: ${error.message}`
+    });
+  }
+}
+
+/**
+ * 获取可用的API提供者
+ */
+function getAvailableApiProviders(sendResponse) {
+  const providers = apiManager.getSupportedProviders();
+  const currentProvider = apiManager.getCurrentProviderInfo();
+  
+  sendResponse({
+    providers: providers,
+    current: currentProvider,
+    recommendation: providers.find(p => p.available && p.type === 'browser-native') || 
+                   providers.find(p => p.available)
   });
+}
+
+/**
+ * 性能测试
+ */
+async function performApiPerformanceTest(iterations, sendResponse) {
+  console.log(`🏃‍♂️ 开始API性能测试 - ${iterations}次迭代`);
+  
+  try {
+    if (!apiServerRunning) {
+      throw new Error('API服务器未运行，无法进行性能测试');
+    }
+
+    const result = await apiManager.performanceTest(iterations);
+    
+    console.log('📊 性能测试完成:', result);
+    sendResponse({
+      success: true,
+      result: result
+    });
+  } catch (error) {
+    console.error('❌ 性能测试失败:', error);
+    sendResponse({
+      success: false,
+      error: error.message
+    });
+  }
 }
 
 // 扩展安装或更新时
-chrome.runtime.onInstalled.addListener(() => {
+chrome.runtime.onInstalled.addListener(async (details) => {
+  console.log('🔧 JSON格式化大师扩展已安装/更新');
+  console.log('📋 详情:', details);
+  
   // 初始化存储
-  chrome.storage.sync.get(['theme', 'fontSize'], (data) => {
+  try {
+    const data = await chrome.storage.sync.get(['theme', 'fontSize', 'apiProvider']);
+    
+    const updates = {};
     if (!data.theme) {
-      chrome.storage.sync.set({ theme: 'dark' });
+      updates.theme = 'dark';
     }
     if (!data.fontSize) {
-      chrome.storage.sync.set({ fontSize: 14 });
+      updates.fontSize = 14;
     }
-  });
+    if (!data.apiProvider) {
+      updates.apiProvider = 'browser-native'; // 默认使用浏览器原生API
+    }
+    
+    if (Object.keys(updates).length > 0) {
+      await chrome.storage.sync.set(updates);
+      console.log('✅ 默认设置已初始化:', updates);
+    }
+  } catch (error) {
+    console.error('❌ 初始化存储失败:', error);
+  }
+
+  // 预加载API管理器（不启动服务）
+  try {
+    console.log('🔄 预初始化API管理器...');
+    
+    // 检查各个API提供者的可用性
+    const providers = apiManager.getSupportedProviders();
+    const availableProviders = providers.filter(p => p.available);
+    
+    console.log('📋 可用的API提供者:', availableProviders.map(p => p.name));
+    
+    if (availableProviders.length === 0) {
+      console.warn('⚠️ 没有可用的API提供者');
+    } else {
+      console.log('✅ API管理器预初始化完成');
+    }
+  } catch (error) {
+    console.error('❌ API管理器预初始化失败:', error);
+  }
 });
+
+// 扩展启动时
+chrome.runtime.onStartup.addListener(() => {
+  console.log('🚀 JSON格式化大师扩展已启动');
+  apiServerRunning = false;
+  currentJsonData = {};
+});
+
+// 监听扩展挂起（如果支持）
+chrome.runtime.onSuspend?.addListener(() => {
+  console.log('😴 JSON格式化大师扩展即将挂起');
+  if (apiServerRunning) {
+    console.log('🛑 自动停止API服务器...');
+    stopBrowserNativeApiServer(() => {
+      console.log('✅ API服务器已在挂起前停止');
+    });
+  }
+});
+
+// 错误处理
+self.addEventListener('error', (event) => {
+  console.error('🚨 Background Service Worker错误:', event.error);
+});
+
+self.addEventListener('unhandledrejection', (event) => {
+  console.error('🚨 未处理的Promise拒绝:', event.reason);
+});
+
+console.log('✅ JSON格式化大师 Background Service Worker 已加载');
+console.log('🔧 支持的API提供者: 浏览器原生、IndexedDB、内存');
+console.log('📡 等待用户启动API服务...');
