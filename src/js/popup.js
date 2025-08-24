@@ -53,7 +53,7 @@ function initializeIcons() {
   // 设置按钮图标
   document.querySelector('#format-btn .icon-container').innerHTML = IconManager.getIcon('format');
   document.querySelector('#minify-btn .icon-container').innerHTML = IconManager.getIcon('minify');
-  document.querySelector('#fix-btn .icon-container').innerHTML = IconManager.getIcon('fix');
+
   document.querySelector('#copy-btn .icon-container').innerHTML = IconManager.getIcon('copy');
   document.querySelector('#download-btn .icon-container').innerHTML = IconManager.getIcon('download');
   document.querySelector('#convert-btn .icon-container').innerHTML = IconManager.getIcon('convert');
@@ -93,7 +93,6 @@ function setupEventListeners() {
   // JSON操作按钮
   document.getElementById('format-btn').addEventListener('click', formatJSON);
   document.getElementById('minify-btn').addEventListener('click', minifyJSON);
-  document.getElementById('fix-btn').addEventListener('click', fixJSON);
   document.getElementById('copy-btn').addEventListener('click', copyJSON);
   document.getElementById('download-btn').addEventListener('click', downloadJSON);
   document.getElementById('convert-btn').addEventListener('click', showConvertModal);
@@ -254,44 +253,6 @@ function minifyJSON() {
   }
 }
 
-// 修复JSON
-function fixJSON() {
-  const input = document.getElementById('json-input');
-  const value = input.value.trim();
-  
-  if (!value) {
-    updateStatus('没有JSON数据需要修复', 'error');
-    return;
-  }
-  
-  try {
-    // 使用错误处理器修复JSON
-    const result = errorHandler.tryToFix(value);
-    
-    if (result.success) {
-      input.value = result.result;
-      if (result.fixed) {
-        updateStatus('JSON修复并格式化成功', 'success');
-        jsonData = result.data;
-        
-        // 确保行号更新
-        setTimeout(() => {
-          LineNumberManager.updateLineNumbersStatic();
-        }, 10);
-      } else {
-        updateStatus('JSON已经是有效格式，无需修复', 'success');
-      }
-    } else {
-      // 显示错误分析结果
-      const errorInfo = result.error;
-      updateStatus(`修复失败: ${errorInfo.message}，${errorInfo.suggestion}`, 'error');
-    }
-    
-    updateCharCount();
-  } catch (error) {
-    updateStatus(`修复失败: ${error.message}`, 'error');
-  }
-}
 
 // 复制JSON（使用现代API）
 function copyJSON() {

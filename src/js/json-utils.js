@@ -1,6 +1,6 @@
 /**
  * JSON格式化大师 - JSON工具函数
- * 用于处理JSON格式化、压缩和修复
+ * 用于处理JSON格式化和压缩
  */
 
 class JsonUtils {
@@ -75,56 +75,6 @@ class JsonUtils {
     }
   }
   
-  /**
-   * 修复JSON字符串中的常见错误
-   * @param {string} jsonString - 要修复的JSON字符串
-   * @returns {Object} 包含修复结果的对象
-   */
-  static fix(jsonString) {
-    try {
-      // 如果输入为空，返回空对象
-      if (!jsonString.trim()) {
-        return {
-          success: true,
-          result: '{}',
-          data: {}
-        };
-      }
-      
-      // 尝试修复常见错误
-      let fixedJson = jsonString
-        // 修复缺少引号的键
-        .replace(/(['"])?([a-zA-Z0-9_]+)(['"])?:/g, '"$2":')
-        // 修复单引号
-        .replace(/'/g, '"')
-        // 修复尾随逗号
-        .replace(/,\s*([\]}])/g, '$1')
-        // 修复缺少逗号
-        .replace(/([}\]])\s*([{[])/g, '$1,$2')
-        // 修复布尔值和null
-        .replace(/:\s*undefined/g, ':null')
-        .replace(/:\s*True/g, ':true')
-        .replace(/:\s*False/g, ':false');
-      
-      // 尝试解析修复后的JSON
-      const parsed = JSON.parse(fixedJson);
-      
-      // 格式化
-      const formatted = JSON.stringify(parsed, null, 2);
-      
-      return {
-        success: true,
-        result: formatted,
-        data: parsed,
-        fixed: fixedJson !== jsonString // 是否进行了修复
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: error.message
-      };
-    }
-  }
   
   /**
    * 语法高亮JSON字符串
