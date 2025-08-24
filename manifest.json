@@ -20,6 +20,7 @@
     "activeTab",
     "storage",
     "clipboardWrite",
+    "clipboardRead",
     "scripting"
   ],
   "host_permissions": [
@@ -40,5 +41,8 @@
       "resources": ["src/css/*", "src/js/*", "src/images/*"],
       "matches": ["<all_urls>"]
     }
-  ]
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'; style-src 'self' 'unsafe-inline';"
+  }
 }

@@ -104,12 +104,16 @@ function setupEventListeners() {
   document.getElementById('settings-btn').addEventListener('click', () => settingsManager.toggleSettings());
 
   // 输入框事件（使用防抖优化）
-  document.getElementById('json-input').addEventListener('input', 
+  const jsonInput = document.getElementById('json-input');
+  jsonInput.addEventListener('input', 
     performanceOptimizer.debounce(() => {
       updateCharCount();
       LineNumberManager.updateLineNumbersStatic();
     }, 300)
   );
+  
+  // 监听粘贴事件，自动识别分享链接（移除防抖以确保能正确获取剪贴板数据）
+  jsonInput.addEventListener('paste', handlePasteEvent);
 
   // 模态框关闭按钮
   document.querySelectorAll('.close-btn').forEach(btn => {
@@ -163,6 +167,187 @@ function setupEventListeners() {
       }
     });
   });
+}
+
+// 处理粘贴事件，识别分享链接
+function handlePasteEvent(e) {
+  console.log('🎯 粘贴事件触发:', e);
+  console.log('📅 事件时间:', new Date().toLocaleTimeString());
+  console.log('🏷️  事件类型:', e.type, '| 是否可信任:', e.isTrusted);
+  
+  // 获取粘贴的文本 - 多种兼容性方式
+  const clipboardData = e.clipboardData || window.clipboardData;
+  
+  console.log('📋 剪贴板数据检查:');
+  console.log('   - e.clipboardData存在:', !!e.clipboardData);
+  console.log('   - window.clipboardData存在:', !!window.clipboardData);
+  console.log('   - 最终使用对象:', !!clipboardData);
+  
+  if (!clipboardData) {
+    console.warn('❌ 无法获取剪贴板数据对象');
+    // 尝试使用现代Clipboard API作为后备
+    if (navigator.clipboard && navigator.clipboard.readText) {
+      console.log('🔄 尝试使用Clipboard API后备方案...');
+      navigator.clipboard.readText().then(text => {
+        console.log('📋 Clipboard API获取到的内容:', text);
+        if (text && text.trim()) {
+          processClipboardText(text, e);
+        }
+      }).catch(error => {
+        console.error('❌ Clipboard API也失败:', error);
+      });
+    }
+    return; // 让默认粘贴行为继续
+  }
+  
+  // 尝试获取多种格式的数据
+  let pastedText = null;
+  const formats = ['text', 'text/plain', 'Text'];
+  
+  for (const format of formats) {
+    try {
+      const data = clipboardData.getData(format);
+      if (data) {
+        pastedText = data;
+        console.log(`✅ 成功获取${format}格式数据:`, data.length, '字符');
+        break;
+      }
+    } catch (error) {
+      console.log(`⚠️  获取${format}格式失败:`, error.message);
+    }
+  }
+  
+  // 显示可用的数据类型
+  if (clipboardData.types) {
+    console.log('📝 可用数据类型:', Array.from(clipboardData.types));
+  }
+  
+  console.log('📊 粘贴内容分析:');
+  console.log('   - 内容长度:', pastedText ? pastedText.length : 0);
+  console.log('   - 内容预览:', pastedText ? (pastedText.length > 100 ? pastedText.substring(0, 100) + '...' : pastedText) : '(无内容)');
+  
+  // 如果没有内容，直接返回
+  if (!pastedText || pastedText.trim() === '') {
+    console.log('❌ 粘贴内容为空，执行默认行为');
+    return;
+  }
+  
+  // 处理获取到的文本
+  processClipboardText(pastedText, e);
+}
+
+// 处理剪贴板文本的辅助函数
+function processClipboardText(pastedText, originalEvent) {
+  console.log('🔄 开始处理剪贴板文本...');
+  
+  // 检查是否为分享链接
+  const isShareLink = shareManager.isShareLink(pastedText);
+  console.log('🔗 分享链接检测结果:', isShareLink);
+  
+  if (isShareLink) {
+    // 阻止默认的粘贴行为（如果事件对象存在）
+    if (originalEvent && originalEvent.preventDefault) {
+      originalEvent.preventDefault();
+      console.log('🚫 已阻止默认粘贴行为');
+    }
+    
+    // 显示加载状态
+    updateStatus('正在解析分享链接...', '');
+    
+    // 尝试解析分享链接
+    try {
+      console.log('🔧 尝试解析分享链接:', pastedText);
+      const jsonData = shareManager.getDataFromUrl(pastedText);
+      console.log('📊 解析结果:', jsonData);
+      
+      if (jsonData) {
+        // 格式化并显示JSON数据
+        const formattedJson = JSON.stringify(jsonData, null, 2);
+        document.getElementById('json-input').value = formattedJson;
+        
+        // 更新相关UI
+        updateCharCount();
+        LineNumberManager.updateLineNumbersStatic();
+        
+        // 显示成功提示，包含统计信息
+        const stats = shareManager.getShareLinkStats(jsonData);
+        let statusMessage = '✓ 已成功导入分享的JSON数据';
+        if (stats && stats.isCompressed) {
+          statusMessage += ` (自动解压，压缩率: ${stats.compressionRatio}%)`;
+        }
+        updateStatus(statusMessage, 'success');
+        
+        // 记录到全局变量
+        window.jsonData = jsonData;
+        
+        // 自动隐藏历史面板（如果展开），方便查看导入的数据
+        const historySection = document.getElementById('history-section');
+        if (historySection && !historySection.classList.contains('collapsed')) {
+          const toggleBtn = document.getElementById('history-toggle-btn');
+          if (toggleBtn) {
+            setTimeout(() => toggleBtn.click(), 500);
+          }
+        }
+      } else {
+        updateStatus('⚠️ 无法解析分享链接，链接可能已损坏或过期', 'error');
+      }
+    } catch (error) {
+      console.error('❌ 解析分享链接错误:', error);
+      let errorMessage = '解析分享链接失败';
+      if (error.message.includes('Invalid URL')) {
+        errorMessage += ': 链接格式不正确';
+      } else if (error.message.includes('JSON')) {
+        errorMessage += ': JSON数据格式错误';
+      } else {
+        errorMessage += `: ${error.message}`;
+      }
+      updateStatus(errorMessage, 'error');
+    }
+  } else {
+    console.log('ℹ️  不是分享链接，执行默认粘贴行为');
+    // 不阻止默认行为，让正常粘贴继续
+  }
+}
+
+// 模态框内部消息管理函数
+function showModalMessage(modalId, message, type = 'info', duration = 3000) {
+  const modal = document.getElementById(modalId);
+  if (!modal) return;
+  
+  const messageElement = modal.querySelector('.modal-message');
+  if (!messageElement) return;
+  
+  // 清除之前的样式类
+  messageElement.classList.remove('success', 'error', 'warning', 'info', 'fade-out');
+  
+  // 设置消息内容和类型
+  messageElement.textContent = message;
+  messageElement.classList.add(type);
+  messageElement.style.display = 'block';
+  
+  // 如果有持续时间，自动隐藏
+  if (duration > 0) {
+    setTimeout(() => {
+      hideModalMessage(modalId);
+    }, duration);
+  }
+}
+
+function hideModalMessage(modalId) {
+  const modal = document.getElementById(modalId);
+  if (!modal) return;
+  
+  const messageElement = modal.querySelector('.modal-message');
+  if (!messageElement) return;
+  
+  // 添加淡出动画
+  messageElement.classList.add('fade-out');
+  
+  // 动画结束后隐藏元素
+  setTimeout(() => {
+    messageElement.style.display = 'none';
+    messageElement.classList.remove('fade-out');
+  }, 300);
 }
 
 // 更新字符计数（优化性能）
@@ -300,26 +485,252 @@ function showShareModal() {
     
     const data = JSON.parse(jsonString);
     
-    // 使用分享管理器生成链接
-    const shareLink = shareManager.generateShareLink(data);
-    document.getElementById('share-link').value = shareLink;
+    // 使用增强的分享管理器生成链接
+    const shareResult = shareManager.generateShareLink(data);
+    
+    if (!shareResult.success) {
+      // 处理分享失败的情况
+      handleShareFailure(shareResult, data, jsonString);
+      return;
+    }
+    
+    // 成功生成分享链接
+    document.getElementById('share-link').value = shareResult.shareLink;
+    
+    // 显示统计信息
+    if (shareResult.stats) {
+      displayShareStats(shareResult.stats);
+    }
+    
+    // 隐藏下载建议区域
+    const downloadSuggestion = document.getElementById('download-suggestion');
+    if (downloadSuggestion) {
+      downloadSuggestion.style.display = 'none';
+    }
+    
     document.getElementById('share-modal').style.display = 'block';
   } catch (error) {
     updateStatus(`分享错误: ${error.message}`, 'error');
   }
 }
 
+// 处理分享失败的情况
+function handleShareFailure(shareResult, data, jsonString) {
+  const modal = document.getElementById('share-modal');
+  const shareOptions = modal.querySelector('.share-options');
+  const downloadSuggestion = document.getElementById('download-suggestion') || createDownloadSuggestion();
+  
+  // 隐藏分享链接输入框
+  shareOptions.style.display = 'none';
+  
+  // 显示下载建议
+  downloadSuggestion.style.display = 'block';
+  
+  // 更新提示信息
+  const messageEl = downloadSuggestion.querySelector('.download-message');
+  const statsEl = downloadSuggestion.querySelector('.download-stats');
+  
+  messageEl.innerHTML = `
+    <div class="error-icon">⚠️</div>
+    <div class="error-text">
+      <h4>数据量过大，无法生成分享链接</h4>
+      <p>${shareResult.message}</p>
+    </div>
+  `;
+  
+  // 显示详细统计
+  const sizeInfo = shareResult.originalSize ? 
+    `数据大小: ${(shareResult.originalSize / 1024).toFixed(1)}KB` : '';
+  const limitInfo = shareResult.maxSize ? 
+    `最大限制: ${(shareResult.maxSize / 1024).toFixed(1)}KB` : 
+    (shareResult.maxUrlLength ? `URL限制: ${shareResult.maxUrlLength}字符` : '');
+  
+  statsEl.innerHTML = `
+    <div class="size-comparison">
+      <div class="stat-row">${sizeInfo}</div>
+      <div class="stat-row">${limitInfo}</div>
+      <div class="stat-row recommendation">建议方案: 使用文件下载方式分享</div>
+    </div>
+  `;
+  
+  // 设置下载按钮事件
+  const downloadBtn = downloadSuggestion.querySelector('#download-json-file');
+  downloadBtn.onclick = () => downloadJsonFile(data, jsonString);
+  
+  // 设置取消按钮事件
+  const cancelBtn = downloadSuggestion.querySelector('#cancel-download-btn');
+  cancelBtn.addEventListener('click', closeDownloadSuggestion);
+  
+  // 显示模态框
+  modal.style.display = 'block';
+  
+  // 更新状态提示
+  updateStatus('数据量过大，建议使用文件下载方式分享', 'warning');
+}
+
+// 显示分享统计信息
+function displayShareStats(stats) {
+  const statsHtml = `
+    <div class="share-stats">
+      <div class="stat-item">
+        <span class="stat-label">数据类型:</span>
+        <span class="stat-value">${stats.dataCategory}</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-label">原始大小:</span>
+        <span class="stat-value">${stats.originalSize} 字符</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-label">编码后:</span>
+        <span class="stat-value">${stats.encodedSize} 字符</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-label">编码方式:</span>
+        <span class="stat-value success">${stats.encodingType || 'Base64'}</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-label">链接长度:</span>
+        <span class="stat-value ${stats.withinUrlLimit ? 'success' : 'error'}">
+          ${stats.finalUrlLength} 字符 ${stats.withinUrlLimit ? '✓' : '⚠️'}
+        </span>
+      </div>
+      ${stats.isCompressed ? `
+        <div class="stat-item">
+          <span class="stat-label">压缩类型:</span>
+          <span class="stat-value success">${stats.compressionType}</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">压缩率:</span>
+          <span class="stat-value success">${stats.compressionRatio}%</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">压缩效率:</span>
+          <span class="stat-value ${stats.efficiency === '极高' || stats.efficiency === '高效' ? 'success' : ''}">${stats.efficiency}</span>
+        </div>
+      ` : ''}
+    </div>
+  `;
+  
+  const statsContainer = document.getElementById('share-stats-container');
+  if (statsContainer) {
+    statsContainer.innerHTML = statsHtml;
+  }
+}
+
+// 创建下载建议区域
+function createDownloadSuggestion() {
+  const modal = document.getElementById('share-modal');
+  const modalContent = modal.querySelector('.modal-content');
+  
+  const downloadSuggestion = document.createElement('div');
+  downloadSuggestion.id = 'download-suggestion';
+  downloadSuggestion.className = 'download-suggestion';
+  downloadSuggestion.innerHTML = `
+    <div class="download-message"></div>
+    <div class="download-stats"></div>
+    <div class="download-actions">
+      <button id="download-json-file" class="btn primary">
+        <span class="download-icon">💾</span>
+        下载 JSON 文件
+      </button>
+      <button class="btn secondary" id="cancel-download-btn">
+        取消
+      </button>
+    </div>
+    <div class="download-help">
+      <h4>为什么需要下载文件？</h4>
+      <ul>
+        <li>您的JSON数据量超过了分享链接的最大支持限制</li>
+        <li>文件下载方式更适合大数据量的传输和存储</li>
+        <li>接收方可以直接在编辑器中打开文件</li>
+        <li>文件方式更安全，不会暴露在URL中</li>
+      </ul>
+    </div>
+  `;
+  
+  // 插入到分享选项之后
+  const shareOptions = modalContent.querySelector('.share-options');
+  shareOptions.insertAdjacentElement('afterend', downloadSuggestion);
+  
+  return downloadSuggestion;
+}
+
+// 关闭下载建议
+function closeDownloadSuggestion() {
+  const downloadSuggestion = document.getElementById('download-suggestion');
+  const shareOptions = document.querySelector('.share-options');
+  
+  if (downloadSuggestion) {
+    downloadSuggestion.style.display = 'none';
+  }
+  if (shareOptions) {
+    shareOptions.style.display = 'flex';
+  }
+  
+  // 关闭模态框
+  document.getElementById('share-modal').style.display = 'none';
+}
+
+// 下载JSON文件
+function downloadJsonFile(data, jsonString) {
+  try {
+    // 生成文件名
+    const fileName = shareManager.generateDownloadFileName(data);
+    
+    // 创建下载链接
+    const blob = new Blob([jsonString], { type: 'application/json;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    
+    // 创建临时下载链接
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = fileName;
+    link.style.display = 'none';
+    
+    // 添加到文档并点击
+    document.body.appendChild(link);
+    link.click();
+    
+    // 清理临时元素和URL
+    setTimeout(() => {
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    }, 100);
+    
+    // 在模态框内显示成功提示
+    showModalMessage('share-modal', `✅ JSON文件已下载: ${fileName}`, 'success', 3000);
+    
+    // 延迟关闭模态框，让用户看到成功提示
+    setTimeout(() => {
+      document.getElementById('share-modal').style.display = 'none';
+    }, 3500);
+    
+  } catch (error) {
+    console.error('下载文件错误:', error);
+    // 在模态框内显示错误提示
+    showModalMessage('share-modal', `❌ 下载失败: ${error.message}`, 'error', 3000);
+  }
+}
+
 // 复制分享链接
-function copyShareLink() {
+async function copyShareLink() {
   const shareLink = document.getElementById('share-link').value;
   
-  // 使用分享管理器复制链接
-  const success = shareManager.copyShareLink(shareLink);
-  
-  if (success) {
-    updateStatus('分享链接已复制', 'success');
-  } else {
-    updateStatus('复制失败，请手动复制', 'error');
+  try {
+    // 使用分享管理器复制链接
+    const success = await shareManager.copyShareLink(shareLink);
+    
+    if (success) {
+      // 在模态框内显示成功提示
+      showModalMessage('share-modal', '✅ 分享链接已复制到剪贴板', 'success', 2000);
+    } else {
+      // 在模态框内显示失败提示
+      showModalMessage('share-modal', '❌ 复制失败，请手动选择链接复制', 'error', 3000);
+    }
+  } catch (error) {
+    console.error('复制分享链接错误:', error);
+    // 在模态框内显示错误提示
+    showModalMessage('share-modal', '❌ 复制失败，请手动选择链接复制', 'error', 3000);
   }
 }
 
@@ -489,7 +900,8 @@ function copyApiUrl() {
   if (navigator.clipboard && navigator.clipboard.writeText) {
     navigator.clipboard.writeText(apiUrl.textContent)
       .then(() => {
-        updateStatus('API地址已复制', 'success');
+        // 在API模态框内显示成功提示
+        showModalMessage('api-modal', '✅ API地址已复制到剪贴板', 'success', 2000);
       })
       .catch(error => {
         console.error('复制失败:', error);
@@ -498,9 +910,14 @@ function copyApiUrl() {
         range.selectNode(apiUrl);
         window.getSelection().removeAllRanges();
         window.getSelection().addRange(range);
-        document.execCommand('copy');
+        const success = document.execCommand('copy');
         window.getSelection().removeAllRanges();
-        updateStatus('API地址已复制', 'success');
+        
+        if (success) {
+          showModalMessage('api-modal', '✅ API地址已复制到剪贴板', 'success', 2000);
+        } else {
+          showModalMessage('api-modal', '❌ 复制失败，请手动选择地址复制', 'error', 3000);
+        }
       });
   } else {
     // 回退到传统方法
@@ -508,9 +925,14 @@ function copyApiUrl() {
     range.selectNode(apiUrl);
     window.getSelection().removeAllRanges();
     window.getSelection().addRange(range);
-    document.execCommand('copy');
+    const success = document.execCommand('copy');
     window.getSelection().removeAllRanges();
-    updateStatus('API地址已复制', 'success');
+    
+    if (success) {
+      showModalMessage('api-modal', '✅ API地址已复制到剪贴板', 'success', 2000);
+    } else {
+      showModalMessage('api-modal', '❌ 复制失败，请手动选择地址复制', 'error', 3000);
+    }
   }
 }
 

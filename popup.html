@@ -62,6 +62,10 @@
       <div class="modal-content">
         <span class="close-btn">&times;</span>
         <h2>FastAPI接口</h2>
+        
+        <!-- 模态框内部提示区域 -->
+        <div id="api-modal-message" class="modal-message" style="display: none;"></div>
+        
         <div class="api-info">
           <p>API服务器状态: <span id="api-status">未启动</span></p>
           <button id="start-api-btn" class="btn primary">启动API服务</button>
@@ -82,9 +86,25 @@
       <div class="modal-content">
         <span class="close-btn">&times;</span>
         <h2>分享JSON数据</h2>
+        
+        <!-- 模态框内部提示区域 -->
+        <div id="share-modal-message" class="modal-message" style="display: none;"></div>
+        
         <div class="share-options">
           <input type="text" id="share-link" readonly>
           <button id="copy-share-link" class="btn primary">复制链接</button>
+        </div>
+        <!-- 分享统计信息 -->
+        <div id="share-stats-container" class="share-stats-container"></div>
+        <div class="share-help">
+          <p><strong>使用说明：</strong></p>
+          <ul>
+            <li>复制分享链接发送给他人</li>
+            <li>直接在编辑器中粘贴分享链接即可自动导入JSON</li>
+            <li>支持智能分级压缩：小数据保持原始，大数据自动高效压缩</li>
+            <li>极大JSON数据使用最大压缩算法，最多可节省70%空间</li>
+            <li>支持缓存机制，重复分享相同数据更快速</li>
+          </ul>
         </div>
       </div>
     </div>
@@ -105,6 +125,10 @@
       <div class="modal-content">
         <span class="close-btn">&times;</span>
         <h2>保存JSON数据</h2>
+        
+        <!-- 模态框内部提示区域 -->
+        <div id="save-modal-message" class="modal-message" style="display: none;"></div>
+        
         <div class="save-form">
           <div class="form-group">
             <label for="save-title-input">标题：</label>
