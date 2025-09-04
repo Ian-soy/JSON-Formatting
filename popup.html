@@ -17,6 +17,7 @@
     
     <div class="toolbar">
       <button id="format-btn" class="btn primary" title="格式化JSON"><span class="icon-container"></span></button>
+      <button id="parse-string-btn" class="btn secondary" title="解析转义字符串"><span class="icon-container">🔍</span></button>
       <button id="minify-btn" class="btn secondary" title="压缩JSON"><span class="icon-container"></span></button>
 
       <button id="copy-btn" class="btn secondary" title="复制到剪贴板"><span class="icon-container"></span></button>
@@ -46,9 +47,15 @@
                 <h4>快速操作提示：</h4>
                 <ul>
                   <li>粘贴JSON数据后使用格式化功能</li>
+                  <li>粘贴包含转义引号的JSON字符串后使用解析功能</li>
                   <li>粘贴分享链接自动导入JSON数据</li>
                   <li>右侧历史面板可加载保存的数据</li>
                 </ul>
+                <div style="margin-top: 15px;">
+                  <button onclick="testEscapedParsing()" style="padding: 8px 12px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                    🧪 测试JSON字符串解析
+                  </button>
+                </div>
               </div>
             </div>
           </div>

@@ -6,6 +6,7 @@ let isEmptyStateDisplayed = false; // 标记是否显示空状态
 // 工具栏按钮状态管理
 const TOOLBAR_BUTTONS = [
   { id: 'format-btn', title: '格式化JSON' },
+  { id: 'parse-string-btn', title: '解析转义字符串' },
   { id: 'minify-btn', title: '压缩JSON' },
   { id: 'copy-btn', title: '复制到剪贴板' },
   { id: 'download-btn', title: '下载JSON文件' },
@@ -80,8 +81,9 @@ function checkJsonDataStatus() {
     };
   }
   
-  // 检查JSON是否有效
-  const isValid = JsonUtils.isValid(value);
+  // 使用智能解析功能检查JSON有效性（包括转义字符串）
+  const smartResult = JsonUtils.smartFormat(value);
+  const isValid = smartResult.success;
   
   if (!isValid) {
     return {
@@ -106,20 +108,36 @@ function checkJsonDataStatus() {
 function updateToolbarButtonsState() {
   const status = checkJsonDataStatus();
   const shouldEnable = status.hasData && status.isValid;
+  const input = document.getElementById('json-input');
+  const inputValue = input.value.trim();
   
   TOOLBAR_BUTTONS.forEach(buttonConfig => {
     const button = document.getElementById(buttonConfig.id);
     if (button) {
-      if (shouldEnable) {
-        // 启用按钮
-        button.disabled = false;
-        button.classList.remove('disabled');
-        button.title = buttonConfig.title;
+      // 对于解析字符串按钮，只要有输入就启用
+      if (buttonConfig.id === 'parse-string-btn') {
+        if (inputValue) {
+          button.disabled = false;
+          button.classList.remove('disabled');
+          button.title = buttonConfig.title;
+        } else {
+          button.disabled = true;
+          button.classList.add('disabled');
+          button.title = `${buttonConfig.title} - 请先输入字符串`;
+        }
       } else {
-        // 禁用按钮
-        button.disabled = true;
-        button.classList.add('disabled');
-        button.title = `${buttonConfig.title}`;
+        // 其他按钮按原有逻辑
+        if (shouldEnable) {
+          // 启用按钮
+          button.disabled = false;
+          button.classList.remove('disabled');
+          button.title = buttonConfig.title;
+        } else {
+          // 禁用按钮
+          button.disabled = true;
+          button.classList.add('disabled');
+          button.title = `${buttonConfig.title}`;
+        }
       }
     }
   });
@@ -205,6 +223,7 @@ function setupEventListeners() {
 
   // JSON操作按钮
   document.getElementById('format-btn').addEventListener('click', formatJSON);
+  document.getElementById('parse-string-btn').addEventListener('click', parseEscapedString);
   document.getElementById('minify-btn').addEventListener('click', minifyJSON);
   document.getElementById('copy-btn').addEventListener('click', copyJSON);
   document.getElementById('download-btn').addEventListener('click', downloadJSON);
@@ -474,14 +493,14 @@ function updateCharCount() {
 // 格式化JSON（使用Web Worker处理大型JSON）
 function formatJSON() {
   // 检查数据有效性
-  const dataStatus = checkJsonDataStatus();
-  if (!dataStatus.hasData || !dataStatus.isValid) {
-    updateStatus(dataStatus.message, dataStatus.isEmpty ? 'warning' : 'error');
-    return;
-  }
-  
   const input = document.getElementById('json-input');
   const jsonString = input.value.trim();
+  
+  // 如果为空，提示用户输入
+  if (!jsonString) {
+    updateStatus('请先输入或粘贴JSON数据', 'warning');
+    return;
+  }
   
   // 检查是否为大型JSON
   if (performanceOptimizer.isLargeJson(jsonString)) {
@@ -491,16 +510,31 @@ function formatJSON() {
     // 使用Web Worker处理
     performanceOptimizer.processWithWebWorker(jsonString, (data) => {
       try {
-        const parsed = JSON.parse(data);
-        return JSON.stringify(parsed, null, 2);
+        // 使用智能格式化功能
+        const result = JsonUtils.smartFormat(data);
+        if (result.success) {
+          return result.result;
+        } else {
+          throw new Error(result.error);
+        }
       } catch (error) {
         throw new Error(`格式化错误: ${error.message}`);
       }
     })
     .then(result => {
-      input.value = result;
-      jsonData = JSON.parse(result);
-      updateStatus('JSON格式化成功', 'success');
+      const smartResult = JsonUtils.smartFormat(result);
+      if (smartResult.success) {
+        input.value = smartResult.result;
+        jsonData = smartResult.data;
+        
+        let statusMessage = 'JSON格式化成功';
+        if (smartResult.wasEscaped) {
+          statusMessage += ' (已自动解析转义字符串)';
+        }
+        updateStatus(statusMessage, 'success');
+      } else {
+        updateStatus(`格式化错误: ${smartResult.error}`, 'error');
+      }
       updateCharCount();
       
       // 确保行号更新
@@ -512,13 +546,18 @@ function formatJSON() {
       updateStatus(error.message, 'error');
     });
   } else {
-    // 直接处理小型JSON
+    // 直接处理小型JSON，使用智能格式化
     try {
-      const result = JsonUtils.format(jsonString);
+      const result = JsonUtils.smartFormat(jsonString);
       if (result.success) {
         input.value = result.result;
         jsonData = result.data;
-        updateStatus('JSON格式化成功', 'success');
+        
+        let statusMessage = 'JSON格式化成功';
+        if (result.wasEscaped) {
+          statusMessage += ' (已自动解析转义字符串)';
+        }
+        updateStatus(statusMessage, 'success');
         
         // 确保行号更新
         setTimeout(() => {
@@ -528,9 +567,159 @@ function formatJSON() {
         updateStatus(`格式化错误: ${result.error}`, 'error');
       }
       updateCharCount();
+      // 更新工具栏按钮状态
+      updateToolbarButtonsState();
+      // 更新空状态覆盖层
+      updateEmptyStateOverlay();
     } catch (error) {
       updateStatus(`格式化错误: ${error.message}`, 'error');
     }
+  }
+}
+
+// 解析转义字符串
+function parseEscapedString() {
+  console.log('🔍 parseEscapedString 函数被调用');
+  
+  const input = document.getElementById('json-input');
+  const jsonString = input.value.trim();
+  
+  console.log('📝 输入内容:', jsonString.substring(0, 100) + (jsonString.length > 100 ? '...' : ''));
+  
+  // 如果为空，提示用户输入
+  if (!jsonString) {
+    console.log('❌ 输入为空');
+    updateStatus('请先输入要解析的转义字符串', 'warning');
+    return;
+  }
+  
+  try {
+    console.log('🔄 开始使用 JsonUtils.parseEscapedJson 解析...');
+    
+    // 使用智能解析功能
+    const result = JsonUtils.parseEscapedJson(jsonString);
+    
+    console.log('📊 解析结果:', result);
+    
+    if (result.success) {
+      console.log('✅ 解析成功，开始格式化...');
+      
+      // 解析成功，确保格式化显示
+      let parsedData;
+      if (typeof result.result === 'string') {
+        // 如果结果是字符串，尝试解析为对象
+        try {
+          parsedData = JSON.parse(result.result);
+          console.log('🔄 字符串结果已解析为对象');
+        } catch (e) {
+          parsedData = result.result;
+          console.log('⚠️ 字符串结果无法进一步解析，保持原样');
+        }
+      } else {
+        parsedData = result.result;
+        console.log('📄 结果已经是对象格式');
+      }
+      
+      // 始终格式化为缩进的JSON
+      const formattedJson = JSON.stringify(parsedData, null, 2);
+      console.log('🎨 格式化完成，长度:', formattedJson.length);
+      
+      input.value = formattedJson;
+      
+      // 更新全局数据
+      jsonData = parsedData;
+      
+      // 显示成功消息
+      let statusMessage = '✓ 转义字符串解析成功';
+      if (result.wasEscaped) {
+        statusMessage += ' (已自动转换为格式化JSON)';
+      } else {
+        statusMessage += ' (数据已经是有效JSON格式，已重新格式化)';
+      }
+      
+      console.log('📢 显示成功状态:', statusMessage);
+      updateStatus(statusMessage, 'success');
+      
+      // 更新UI
+      updateCharCount();
+      updateToolbarButtonsState();
+      updateEmptyStateOverlay();
+      
+      // 确保行号更新
+      setTimeout(() => {
+        LineNumberManager.updateLineNumbersStatic();
+        console.log('📏 行号已更新');
+      }, 10);
+      
+    } else {
+      console.log('❌ 解析失败，尝试备选方案...');
+      
+      // 新增：尝试处理包含转义引号的JSON字符串
+      if (JsonUtils.containsEscapedQuotes(jsonString)) {
+        console.log('🔄 检测到转义引号，尝试特殊处理...');
+        
+        try {
+          // 直接尝试解析包含转义引号的字符串
+          const parsed = JSON.parse(jsonString);
+          const formatted = JSON.stringify(parsed, null, 2);
+          input.value = formatted;
+          jsonData = parsed;
+          
+          console.log('✅ 转义引号字符串解析成功');
+          updateStatus('✓ 转义引号字符串解析成功', 'success');
+          updateCharCount();
+          updateToolbarButtonsState();
+          updateEmptyStateOverlay();
+          setTimeout(() => {
+            LineNumberManager.updateLineNumbersStatic();
+          }, 10);
+          return;
+        } catch (e) {
+          console.log('❌ 转义引号字符串解析失败:', e.message);
+        }
+      }
+      
+      // 解析失败
+      let errorMessage = '解析失败: ' + result.error;
+      
+      // 检查是否是已经格式化的JSON
+      if (JsonUtils.isValid(jsonString)) {
+        console.log('🔄 输入是有效JSON，直接格式化...');
+        
+        // 如果是有效JSON，直接格式化
+        try {
+          const parsed = JSON.parse(jsonString);
+          const formatted = JSON.stringify(parsed, null, 2);
+          input.value = formatted;
+          jsonData = parsed;
+          
+          console.log('✅ JSON重新格式化成功');
+          updateStatus('✓ JSON已重新格式化', 'success');
+          updateCharCount();
+          updateToolbarButtonsState();
+          updateEmptyStateOverlay();
+          setTimeout(() => {
+            LineNumberManager.updateLineNumbersStatic();
+          }, 10);
+          return;
+        } catch (e) {
+          console.log('❌ JSON格式化失败:', e.message);
+          errorMessage = 'JSON解析错误: ' + e.message;
+        }
+      } else if (JsonUtils.looksLikeJson(jsonString)) {
+        errorMessage = 'JSON格式错误，请检查语法后再试';
+        console.log('⚠️ 看起来像JSON但格式错误');
+      } else {
+        console.log('❌ 输入不像JSON格式');
+      }
+      
+      console.log('📢 显示错误状态:', errorMessage);
+      updateStatus(errorMessage, 'error');
+    }
+    
+  } catch (error) {
+    console.log('💥 函数执行异常:', error);
+    updateStatus(`解析错误: ${error.message}`, 'error');
   }
 }
 
@@ -1104,3 +1293,35 @@ async function saveCurrentData() {
     updateStatus('保存失败，请重试', 'error');
   }
 }
+
+// 测试转义字符串解析功能
+function testEscapedParsing() {
+  console.log('🧪 测试转义字符串解析功能...');
+  
+  // 使用用户提供的实际字符串
+  const testString = '[{\"title\":\"终审阳性率（数量）\",\"indicatorType\":\"indicator\",\"indicator\":\"D0032\",\"value\":\"\",\"unit\":\"份\",\"img\":\"img/summary-icon-1@2x.3f60ff8f.png\"}]';
+  
+  const input = document.getElementById('json-input');
+  input.value = testString;
+  
+  console.log('📝 填入测试数据:', testString);
+  console.log('🔍 字符串特征:');
+  console.log('- 长度:', testString.length);
+  console.log('- 以 [ 开始:', testString.startsWith('['));
+  console.log('- 以 ] 结束:', testString.endsWith(']'));
+  console.log('- 包含转义引号:', testString.includes('\\"'));
+  
+  // 更新UI
+  updateCharCount();
+  updateToolbarButtonsState();
+  updateEmptyStateOverlay();
+  
+  // 立即调用解析功能
+  setTimeout(() => {
+    console.log('🚀 调用 parseEscapedString...');
+    parseEscapedString();
+  }, 100);
+}
+
+// 将测试函数暴露到全局作用域
+window.testEscapedParsing = testEscapedParsing;
