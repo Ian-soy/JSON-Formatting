@@ -9,7 +9,6 @@ let lastAutoSaveTime = 0; // 上次自动保存的时间
 // 工具栏按钮状态管理
 const TOOLBAR_BUTTONS = [
   { id: 'format-btn', title: '格式化JSON' },
-  { id: 'parse-string-btn', title: '解析转义字符串' },
   { id: 'minify-btn', title: '压缩JSON' },
   { id: 'copy-btn', title: '复制到剪贴板' },
   { id: 'download-btn', title: '下载JSON文件' },
@@ -238,24 +237,8 @@ function updateToolbarButtonsState() {
   TOOLBAR_BUTTONS.forEach(buttonConfig => {
     const button = document.getElementById(buttonConfig.id);
     if (button) {
-      // 对于解析字符串按钮，需要数据有效才启用
-      if (buttonConfig.id === 'parse-string-btn') {
-        if (inputValue && status.isValid) {
-          button.disabled = false;
-          button.classList.remove('disabled');
-          button.title = buttonConfig.title;
-        } else {
-          button.disabled = true;
-          button.classList.add('disabled');
-          if (!inputValue) {
-            button.title = `${buttonConfig.title} - 请先输入字符串`;
-          } else {
-            button.title = `${buttonConfig.title}`;
-          }
-        }
-      }
       // 对于格式化按钮，只要有输入就启用（即使格式无效，也允许格式化以查看错误）
-      else if (buttonConfig.id === 'format-btn') {
+      if (buttonConfig.id === 'format-btn') {
         if (inputValue) {
           button.disabled = false;
           button.classList.remove('disabled');
@@ -369,7 +352,6 @@ function setupEventListeners() {
 
   // JSON操作按钮
   document.getElementById('format-btn').addEventListener('click', formatJSON);
-  document.getElementById('parse-string-btn').addEventListener('click', parseEscapedString);
   document.getElementById('minify-btn').addEventListener('click', minifyJSON);
   document.getElementById('copy-btn').addEventListener('click', copyJSON);
   document.getElementById('download-btn').addEventListener('click', downloadJSON);
