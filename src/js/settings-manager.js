@@ -329,24 +329,7 @@ class SettingsManager {
       storageInfo = await this.dataManager.getStorageInfo();
     }
 
-    // 更新基本信息
-    const currentItemsElement = document.getElementById('current-items-count');
-    if (currentItemsElement) {
-      currentItemsElement.textContent = `${storageInfo.totalItems}/${storageInfo.maxItems}`;
-    }
-
-    const expirationInfoElement = document.getElementById('expiration-info');
-    if (expirationInfoElement) {
-      expirationInfoElement.textContent = `${storageInfo.expirationDays}天`;
-    }
-
-    const oldestItemElement = document.getElementById('oldest-item-date');
-    if (oldestItemElement && storageInfo.oldestItem) {
-      const date = new Date(storageInfo.oldestItem);
-      oldestItemElement.textContent = date.toLocaleDateString('zh-CN');
-    } else if (oldestItemElement) {
-      oldestItemElement.textContent = '无数据';
-    }
+    // 注意：存储信息显示已从设置面板中移除，仅保留动态创建的存储使用情况显示
     
     // 更新存储使用情况显示
     await this.updateStorageUsageDisplay(storageInfo.storage);
@@ -357,26 +340,18 @@ class SettingsManager {
   
   /**
    * 更新存储使用情况显示
+   * 注意：已移除设置面板中的存储显示，此函数仅保留以保持兼容性
    */
   async updateStorageUsageDisplay(storageUsage) {
-    if (!storageUsage) {
-      storageUsage = await this.dataManager.getStorageUsage();
+    // 仅更新已存在的存储容器，不再创建新的
+    const storageContainer = document.getElementById('storage-usage-container');
+    if (!storageContainer) {
+      // 不再在设置面板中创建存储使用情况显示
+      return;
     }
     
-    // 更新或创建存储使用情况元素
-    let storageContainer = document.getElementById('storage-usage-container');
-    if (!storageContainer) {
-      storageContainer = this.createStorageUsageContainer();
-      const settingsContent = document.querySelector('.settings-content');
-      if (settingsContent) {
-        // 在存储信息后面插入
-        const storageInfoSection = settingsContent.querySelector('.storage-info-section');
-        if (storageInfoSection) {
-          storageInfoSection.insertAdjacentElement('afterend', storageContainer);
-        } else {
-          settingsContent.appendChild(storageContainer);
-        }
-      }
+    if (!storageUsage) {
+      storageUsage = await this.dataManager.getStorageUsage();
     }
     
     // 更新数值
@@ -491,17 +466,16 @@ class SettingsManager {
   
   /**
    * 更新压缩信息显示
+   * 注意：已移除设置面板中的存储显示，此函数仅保留以保持兼容性
    */
   updateCompressionDisplay(compressionInfo) {
     if (!compressionInfo) return;
     
-    let compressionContainer = document.getElementById('compression-info-container');
+    // 仅更新已存在的压缩容器，不再创建新的
+    const compressionContainer = document.getElementById('compression-info-container');
     if (!compressionContainer) {
-      compressionContainer = this.createCompressionInfoContainer();
-      const storageContainer = document.getElementById('storage-usage-container');
-      if (storageContainer) {
-        storageContainer.insertAdjacentElement('afterend', compressionContainer);
-      }
+      // 不再在设置面板中创建压缩信息显示
+      return;
     }
     
     const enabledStatus = compressionContainer.querySelector('.compression-enabled');

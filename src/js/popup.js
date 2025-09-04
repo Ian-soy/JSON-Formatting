@@ -807,7 +807,7 @@ function updateStorageButton(usage) {
 • 使用率: ${usage.formatted.percentage}
 
 点击查看详细信息`;
-  storageBtn.title = tooltipText;
+  storageBtn.title = '';
 }
 
 /**
@@ -826,7 +826,7 @@ async function showStorageQuickInfo() {
     const remainingBytes = usage.quotaBytes - usage.usedBytes;
     
     modal.innerHTML = `
-      <div class="modal-content storage-quick-content">
+      <div class="modal-content">
         <span class="close-btn">&times;</span>
         <h2>📊 存储状态</h2>
         
@@ -860,7 +860,7 @@ async function showStorageQuickInfo() {
         </div>
         
         <div class="quick-actions">
-          <button class="btn secondary" data-action="manage">🔧 管理</button>
+          <button class="btn secondary" data-action="manage">管理</button>
           <button class="btn primary" data-action="close">关闭</button>
         </div>
       </div>
@@ -1847,7 +1847,7 @@ function showStorageWarning(spaceCheck) {
   }
   
   modal.innerHTML = `
-    <div class="modal-content storage-modal-content">
+    <div class="modal-content">
       <span class="close-btn">&times;</span>
       <h2>${icon} ${title}</h2>
       <div class="storage-message">
@@ -1920,7 +1920,7 @@ async function showStorageManagement() {
     const storageUsage = storageInfo.storage;
     
     modal.innerHTML = `
-      <div class="modal-content storage-management-content">
+      <div class="modal-content">
         <span class="close-btn">&times;</span>
         <h2>📊 存储管理</h2>
         
