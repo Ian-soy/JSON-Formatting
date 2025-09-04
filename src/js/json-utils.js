@@ -395,6 +395,297 @@ class JsonUtils {
       return null;
     }
   }
+
+  /**
+   * 详细分析JSON格式错误，定位到具体行号和问题
+   * @param {string} jsonString - 要分析的JSON字符串
+   * @returns {Object} 包含详细错误分析的对象
+   */
+  static analyzeJsonErrors(jsonString) {
+    if (!jsonString || typeof jsonString !== 'string') {
+      return {
+        success: false,
+        error: '输入不是有效的字符串',
+        lineErrors: []
+      };
+    }
+
+    const lines = jsonString.split('\n');
+    const lineErrors = [];
+    let currentLine = 0;
+    let currentColumn = 0;
+    let bracketStack = [];
+    let braceStack = [];
+    let quoteStack = [];
+    let inString = false;
+    let escapeNext = false;
+
+    // 逐行分析
+    for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
+      const line = lines[lineIndex];
+      const lineNumber = lineIndex + 1;
+      currentColumn = 0;
+
+      for (let charIndex = 0; charIndex < line.length; charIndex++) {
+        const char = line[charIndex];
+        const prevChar = charIndex > 0 ? line[charIndex - 1] : '';
+        const nextChar = charIndex < line.length - 1 ? line[charIndex + 1] : '';
+
+        // 处理转义字符
+        if (escapeNext) {
+          escapeNext = false;
+          currentColumn++;
+          continue;
+        }
+
+        if (char === '\\') {
+          escapeNext = true;
+          currentColumn++;
+          continue;
+        }
+
+        // 处理字符串
+        if (char === '"' && !escapeNext) {
+          if (inString) {
+            quoteStack.pop();
+            inString = false;
+          } else {
+            quoteStack.push({ line: lineNumber, column: currentColumn + 1 });
+            inString = true;
+          }
+        }
+
+        // 处理括号和方括号
+        if (!inString) {
+          if (char === '{') {
+            braceStack.push({ line: lineNumber, column: currentColumn + 1 });
+          } else if (char === '}') {
+            if (braceStack.length === 0) {
+              lineErrors.push({
+                line: lineNumber,
+                column: currentColumn + 1,
+                type: 'error',
+                message: '意外的闭合大括号，没有对应的开始大括号',
+                char: char,
+                suggestion: '检查是否有多余的 } 或缺少 {'
+              });
+            } else {
+              braceStack.pop();
+            }
+          } else if (char === '[') {
+            bracketStack.push({ line: lineNumber, column: currentColumn + 1 });
+          } else if (char === ']') {
+            if (bracketStack.length === 0) {
+              lineErrors.push({
+                line: lineNumber,
+                column: currentColumn + 1,
+                type: 'error',
+                message: '意外的闭合方括号，没有对应的开始方括号',
+                char: char,
+                suggestion: '检查是否有多余的 ] 或缺少 ['
+              });
+            } else {
+              bracketStack.pop();
+            }
+          }
+        }
+
+        currentColumn++;
+      }
+
+      // 检查行级别的语法问题
+      const syntaxErrors = this.checkLineSyntax(line, lineNumber);
+      if (syntaxErrors.length > 0) {
+        lineErrors.push(...syntaxErrors);
+      }
+    }
+
+    // 检查未闭合的括号和引号
+    if (braceStack.length > 0) {
+      braceStack.forEach(brace => {
+        lineErrors.push({
+          line: brace.line,
+          column: brace.column,
+          type: 'error',
+          message: '未闭合的大括号',
+          char: '{',
+          suggestion: '在适当位置添加 } 来闭合对象'
+        });
+      });
+    }
+
+    if (bracketStack.length > 0) {
+      bracketStack.forEach(bracket => {
+        lineErrors.push({
+          line: bracket.line,
+          column: bracket.column,
+          type: 'error',
+          message: '未闭合的方括号',
+          char: '[',
+          suggestion: '在适当位置添加 ] 来闭合数组'
+        });
+      });
+    }
+
+    if (quoteStack.length > 0) {
+      quoteStack.forEach(quote => {
+        lineErrors.push({
+          line: quote.line,
+          column: quote.column,
+          type: 'error',
+          message: '未闭合的引号',
+          char: '"',
+          suggestion: '在适当位置添加 " 来闭合字符串'
+        });
+      });
+    }
+
+    // 尝试解析以获取更具体的错误信息
+    try {
+      JSON.parse(jsonString);
+      return {
+        success: true,
+        lineErrors: lineErrors
+      };
+    } catch (parseError) {
+      // 分析解析错误，定位到具体位置
+      const parseErrorInfo = this.analyzeParseError(parseError, jsonString, lines);
+      if (parseErrorInfo) {
+        lineErrors.push(parseErrorInfo);
+      }
+
+      return {
+        success: false,
+        error: parseError.message,
+        lineErrors: lineErrors
+      };
+    }
+  }
+
+  /**
+   * 检查单行语法问题
+   * @param {string} line - 单行内容
+   * @param {number} lineNumber - 行号
+   * @returns {Array} 行级错误数组
+   */
+  static checkLineSyntax(line, lineNumber) {
+    const errors = [];
+    const trimmedLine = line.trim();
+
+    // 检查尾随逗号
+    if (trimmedLine.endsWith(',') && !trimmedLine.endsWith('},') && !trimmedLine.endsWith('],')) {
+      errors.push({
+        line: lineNumber,
+        column: line.length,
+        type: 'warning',
+        message: '尾随逗号',
+        char: ',',
+        suggestion: '移除多余的逗号'
+      });
+    }
+
+    // 检查缺少逗号
+    if (trimmedLine.endsWith('}') || trimmedLine.endsWith(']')) {
+      // 这里需要更复杂的上下文分析
+    }
+
+    // 检查单引号
+    if (trimmedLine.includes("'") && !trimmedLine.includes('"')) {
+      const singleQuoteIndex = trimmedLine.indexOf("'");
+      errors.push({
+        line: lineNumber,
+        column: singleQuoteIndex + 1,
+        type: 'error',
+        message: '使用了单引号，JSON标准要求使用双引号',
+        char: "'",
+        suggestion: '将单引号替换为双引号'
+      });
+    }
+
+    // 检查缺少引号的键
+    const keyPattern = /([{,])\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*:/;
+    const keyMatch = trimmedLine.match(keyPattern);
+    if (keyMatch) {
+      const keyStart = trimmedLine.indexOf(keyMatch[2]);
+      errors.push({
+        line: lineNumber,
+        column: keyStart + 1,
+        type: 'error',
+        message: '对象键缺少引号',
+        char: keyMatch[2],
+        suggestion: '为对象键添加双引号，如 "' + keyMatch[2] + '":'
+      });
+    }
+
+    return errors;
+  }
+
+  /**
+   * 分析JSON.parse的错误信息，定位到具体位置
+   * @param {Error} parseError - JSON.parse抛出的错误
+   * @param {string} jsonString - 原始JSON字符串
+   * @param {Array} lines - 按行分割的数组
+   * @returns {Object|null} 错误信息对象
+   */
+  static analyzeParseError(parseError, jsonString, lines) {
+    const errorMessage = parseError.message;
+    
+    // 提取位置信息
+    const positionMatch = errorMessage.match(/position (\d+)/);
+    if (!positionMatch) return null;
+
+    const position = parseInt(positionMatch[1]);
+    
+    // 计算行号和列号
+    let currentPos = 0;
+    let lineNumber = 1;
+    let columnNumber = 1;
+
+    for (let i = 0; i < jsonString.length; i++) {
+      if (i === position) break;
+      
+      if (jsonString[i] === '\n') {
+        lineNumber++;
+        columnNumber = 1;
+      } else {
+        columnNumber++;
+      }
+      currentPos++;
+    }
+
+    // 分析错误类型
+    let errorType = 'error';
+    let suggestion = '';
+
+    if (errorMessage.includes('Unexpected token')) {
+      const tokenMatch = errorMessage.match(/Unexpected token (.+)/);
+      const token = tokenMatch ? tokenMatch[1] : '未知字符';
+      
+      if (token.includes("'")) {
+        suggestion = '检查是否使用了单引号，JSON标准要求使用双引号';
+      } else if (token.includes('}') || token.includes(']')) {
+        suggestion = '检查是否有多余的闭合括号或缺少开始括号';
+      } else if (token.includes('{') || token.includes('[')) {
+        suggestion = '检查是否缺少逗号分隔符';
+      } else {
+        suggestion = '检查语法是否正确，确保符合JSON格式规范';
+      }
+    } else if (errorMessage.includes('Unexpected end')) {
+      suggestion = '检查是否缺少闭合的括号、方括号或大括号';
+    } else if (errorMessage.includes('Unexpected number')) {
+      suggestion = '检查数字格式是否正确，确保数字不在字符串中';
+    }
+
+    return {
+      line: lineNumber,
+      column: columnNumber,
+      type: errorType,
+      message: errorMessage,
+      char: jsonString[position] || '未知',
+      suggestion: suggestion,
+      position: position
+    };
+  }
 }
 
 // 导出JSON工具类

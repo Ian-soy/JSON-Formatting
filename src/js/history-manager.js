@@ -14,6 +14,10 @@ class HistoryManager {
     this.historyListElement = document.getElementById('history-list');
     this.setupEventListeners();
     this.initializeToggleButton(); // 初始化展开/折叠按钮
+    
+    // 默认折叠历史面板
+    this.collapseHistoryPanel();
+    
     await this.refreshHistoryList();
   }
 
@@ -355,6 +359,19 @@ class HistoryManager {
     if (toggleBtn) {
       // 默认状态为展开，显示向左箭头（折叠）
       toggleBtn.querySelector('.icon-container').innerHTML = IconManager.getIcon('chevron-left');
+    }
+  }
+
+  /**
+   * 折叠历史面板
+   */
+  collapseHistoryPanel() {
+    const historySection = document.getElementById('history-section');
+    const toggleBtn = document.getElementById('history-toggle-btn');
+
+    if (historySection && toggleBtn) {
+      historySection.classList.add('collapsed');
+      toggleBtn.querySelector('.icon-container').innerHTML = IconManager.getIcon('chevron-right');
     }
   }
 }

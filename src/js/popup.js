@@ -2,6 +2,9 @@
 let currentActiveHistoryItem = null;
 let historyManager = null;
 let isEmptyStateDisplayed = false; // 标记是否显示空状态
+let hasOpenedToday = false; // 标记今天是否已经打开过插件
+let autoSaveEnabled = true; // 是否启用自动保存
+let lastAutoSaveTime = 0; // 上次自动保存的时间
 
 // 工具栏按钮状态管理
 const TOOLBAR_BUTTONS = [
@@ -33,6 +36,9 @@ document.addEventListener('DOMContentLoaded', () => {
 // 初始化所有模块
 async function initializeModules() {
   try {
+    // 检查今天是否已经打开过插件
+    await checkTodayOpenedStatus();
+    
     // 初始化主题（只使用监控主题）
     await themeManager.initialize();
     
@@ -57,9 +63,103 @@ async function initializeModules() {
     // 初始化历史数据管理器
     historyManager = new HistoryManager(dataManager);
     await historyManager.initialize();
+    
+    // 等待UI完全初始化后再加载数据
+    setTimeout(async () => {
+      await loadFirstSavedData();
+    }, 200);
   } catch (error) {
     console.error('初始化模块错误:', error);
     updateStatus('初始化失败，请重新加载', 'error');
+  }
+}
+
+/**
+ * 检查今天是否已经打开过插件
+ */
+async function checkTodayOpenedStatus() {
+  try {
+    const today = new Date().toDateString();
+    const result = await chrome.storage.local.get(['last_opened_date']);
+    const lastOpenedDate = result.last_opened_date;
+    
+    console.log('检查今天打开状态:', { today, lastOpenedDate });
+    
+    if (lastOpenedDate === today) {
+      hasOpenedToday = true;
+      console.log('今天已经打开过插件');
+    } else {
+      // 更新为今天
+      await chrome.storage.local.set({ last_opened_date: today });
+      hasOpenedToday = false;
+      console.log('今天第一次打开插件');
+    }
+  } catch (error) {
+    console.error('检查今天打开状态失败:', error);
+    hasOpenedToday = false;
+  }
+}
+
+/**
+ * 加载第一条保存的数据
+ */
+async function loadFirstSavedData() {
+  try {
+    console.log('开始加载第一条保存数据...');
+    const savedData = await dataManager.getSavedData();
+    console.log('获取到的保存数据:', savedData.length, '条');
+    
+    if (savedData.length > 0) {
+      // 按时间倒序排序，取第一条（最新的）
+      const firstItem = savedData[0];
+      console.log('正在加载数据:', firstItem.title);
+      
+      const input = document.getElementById('json-input');
+      if (!input) {
+        console.error('json-input 元素未找到');
+        return;
+      }
+      
+      input.value = firstItem.data;
+      
+      // 更新UI
+      if (typeof updateCharCount === 'function') {
+        updateCharCount();
+      }
+      if (typeof LineNumberManager !== 'undefined') {
+        LineNumberManager.updateLineNumbersStatic();
+      }
+      if (typeof updateToolbarButtonsState === 'function') {
+        updateToolbarButtonsState();
+      }
+      if (typeof updateEmptyStateOverlay === 'function') {
+        updateEmptyStateOverlay();
+      }
+      
+      // 设置全局jsonData变量
+      try {
+        window.jsonData = JSON.parse(firstItem.data);
+      } catch (e) {
+        console.warn('无法解析JSON数据为对象:', e);
+      }
+      
+      // 更新状态
+      if (typeof updateStatus === 'function') {
+        updateStatus(`已自动加载最新保存的数据：${firstItem.title}`, 'success');
+      }
+      
+      // 设置当前活动项
+      currentActiveHistoryItem = firstItem.id;
+      
+      console.log('数据加载成功');
+    } else {
+      console.log('没有保存的数据可加载');
+    }
+  } catch (error) {
+    console.error('加载第一条保存数据失败:', error);
+    if (typeof updateStatus === 'function') {
+      updateStatus('数据加载异常，请手动选择历史数据', 'warning');
+    }
   }
 }
 
@@ -81,25 +181,33 @@ function checkJsonDataStatus() {
     };
   }
   
-  // 使用智能解析功能检查JSON有效性（包括转义字符串）
-  const smartResult = JsonUtils.smartFormat(value);
-  const isValid = smartResult.success;
-  
-  if (!isValid) {
+  // 首先尝试直接解析
+  try {
+    JSON.parse(value);
     return {
       hasData: true,
       isEmpty: false,
-      isValid: false,
-      message: 'JSON数据格式无效，请检查后再试'
+      isValid: true,
+      message: '数据就绪'
     };
+  } catch (parseError) {
+    // 如果直接解析失败，检查是否看起来像JSON
+    if (JsonUtils.looksLikeJson(value)) {
+      return {
+        hasData: true,
+        isEmpty: false,
+        isValid: false,
+        message: 'JSON格式无效，可使用格式化功能查看详细错误信息'
+      };
+    } else {
+      return {
+        hasData: true,
+        isEmpty: false,
+        isValid: false,
+        message: '输入内容不是有效的JSON格式'
+      };
+    }
   }
-  
-  return {
-    hasData: true,
-    isEmpty: false,
-    isValid: true,
-    message: '数据就绪'
-  };
 }
 
 /**
@@ -107,15 +215,30 @@ function checkJsonDataStatus() {
  */
 function updateToolbarButtonsState() {
   const status = checkJsonDataStatus();
-  const shouldEnable = status.hasData && status.isValid;
   const input = document.getElementById('json-input');
   const inputValue = input.value.trim();
   
   TOOLBAR_BUTTONS.forEach(buttonConfig => {
     const button = document.getElementById(buttonConfig.id);
     if (button) {
-      // 对于解析字符串按钮，只要有输入就启用
+      // 对于解析字符串按钮，需要数据有效才启用
       if (buttonConfig.id === 'parse-string-btn') {
+        if (inputValue && status.isValid) {
+          button.disabled = false;
+          button.classList.remove('disabled');
+          button.title = buttonConfig.title;
+        } else {
+          button.disabled = true;
+          button.classList.add('disabled');
+          if (!inputValue) {
+            button.title = `${buttonConfig.title} - 请先输入字符串`;
+          } else {
+            button.title = `${buttonConfig.title}`;
+          }
+        }
+      }
+      // 对于格式化按钮，只要有输入就启用（即使格式无效，也允许格式化以查看错误）
+      else if (buttonConfig.id === 'format-btn') {
         if (inputValue) {
           button.disabled = false;
           button.classList.remove('disabled');
@@ -123,11 +246,12 @@ function updateToolbarButtonsState() {
         } else {
           button.disabled = true;
           button.classList.add('disabled');
-          button.title = `${buttonConfig.title} - 请先输入字符串`;
+          button.title = `${buttonConfig.title}`;
         }
-      } else {
-        // 其他按钮按原有逻辑
-        if (shouldEnable) {
+      }
+      // 其他按钮需要数据有效才启用
+      else {
+        if (status.hasData && status.isValid) {
           // 启用按钮
           button.disabled = false;
           button.classList.remove('disabled');
@@ -136,7 +260,11 @@ function updateToolbarButtonsState() {
           // 禁用按钮
           button.disabled = true;
           button.classList.add('disabled');
-          button.title = `${buttonConfig.title}`;
+          if (status.hasData && !status.isValid) {
+            button.title = `${buttonConfig.title}`;
+          } else {
+            button.title = `${buttonConfig.title}`;
+          }
         }
       }
     }
@@ -149,7 +277,11 @@ function updateToolbarButtonsState() {
     const currentStatus = statusElement.textContent;
     // 只有当前状态是默认状态时才更新
     if (currentStatus === '准备就绪' || currentStatus.includes('请先输入') || currentStatus.includes('格式无效')) {
-      updateStatus(status.message, status.isValid ? '' : 'warning');
+      if (status.hasData && !status.isValid) {
+        updateStatus('JSON格式无效，可使用格式化功能查看详细错误信息', 'warning');
+      } else {
+        updateStatus(status.message, status.isValid ? '' : 'warning');
+      }
     }
   }
 }
@@ -165,14 +297,14 @@ function updateEmptyStateOverlay() {
   
   const value = input.value.trim();
   
-  // 如果输入框为空，显示覆盖层
-  if (!value) {
+  // 如果输入框为空，且今天没有打开过插件，才显示覆盖层
+  if (!value && !hasOpenedToday) {
     if (!isEmptyStateDisplayed) {
       overlay.classList.add('visible');
       isEmptyStateDisplayed = true;
     }
   } else {
-    // 如果输入框有内容，隐藏覆盖层
+    // 如果输入框有内容，或者今天已经打开过，隐藏覆盖层
     if (isEmptyStateDisplayed) {
       overlay.classList.remove('visible');
       isEmptyStateDisplayed = false;
@@ -491,7 +623,7 @@ function updateCharCount() {
 }
 
 // 格式化JSON（使用Web Worker处理大型JSON）
-function formatJSON() {
+async function formatJSON() {
   // 检查数据有效性
   const input = document.getElementById('json-input');
   const jsonString = input.value.trim();
@@ -532,6 +664,9 @@ function formatJSON() {
           statusMessage += ' (已自动解析转义字符串)';
         }
         updateStatus(statusMessage, 'success');
+        
+        // 自动保存格式化后的JSON
+        autoSaveFormattedJson(smartResult.result);
       } else {
         updateStatus(`格式化错误: ${smartResult.error}`, 'error');
       }
@@ -559,12 +694,21 @@ function formatJSON() {
         }
         updateStatus(statusMessage, 'success');
         
+        // 自动保存格式化后的JSON
+        autoSaveFormattedJson(result.result);
+        
         // 确保行号更新
         setTimeout(() => {
           LineNumberManager.updateLineNumbersStatic();
         }, 10);
       } else {
-        updateStatus(`格式化错误: ${result.error}`, 'error');
+        // 格式化失败，进行详细的错误分析
+        const errorAnalysis = JsonUtils.analyzeJsonErrors(jsonString);
+        if (errorAnalysis.lineErrors && errorAnalysis.lineErrors.length > 0) {
+          showDetailedErrors(errorAnalysis.lineErrors);
+        } else {
+          updateStatus(`格式化错误: ${result.error}`, 'error');
+        }
       }
       updateCharCount();
       // 更新工具栏按钮状态
@@ -575,6 +719,117 @@ function formatJSON() {
       updateStatus(`格式化错误: ${error.message}`, 'error');
     }
   }
+}
+
+// 显示详细的错误信息
+function showDetailedErrors(lineErrors) {
+  // 创建错误详情模态框
+  const modal = document.createElement('div');
+  modal.className = 'modal';
+  modal.id = 'error-details-modal';
+  
+  // 按行号排序错误
+  lineErrors.sort((a, b) => a.line - b.line);
+  
+  // 生成错误列表HTML
+  const errorsList = lineErrors.map(error => {
+    const errorIcon = error.type === 'error' ? '❌' : '⚠️';
+    const errorClass = error.type === 'error' ? 'error-item' : 'warning-item';
+    
+    return `
+      <div class="${errorClass}">
+        <div class="error-header">
+          <span class="error-icon">${errorIcon}</span>
+          <span class="error-location">第 ${error.line} 行，第 ${error.column} 列</span>
+          <span class="error-type">${error.type === 'error' ? '错误' : '警告'}</span>
+        </div>
+        <div class="error-message">${error.message}</div>
+        <div class="error-suggestion">💡 ${error.suggestion}</div>
+        <div class="error-char">问题字符: <code>${error.char}</code></div>
+      </div>
+    `;
+  }).join('');
+  
+  modal.innerHTML = `
+    <div class="modal-content error-details-content">
+      <span class="close-btn">&times;</span>
+      <h2>🔍 JSON格式错误详情</h2>
+      <div class="error-summary">
+        <p>发现 <strong>${lineErrors.length}</strong> 个问题，请根据以下提示进行修复：</p>
+      </div>
+      <div class="errors-list">
+        ${errorsList}
+      </div>
+      <div class="modal-actions">
+        <button class="btn primary" onclick="closeErrorDetailsModal()">确定</button>
+        <button class="btn secondary" onclick="highlightErrorsInEditor()">在编辑器中高亮</button>
+      </div>
+    </div>
+  `;
+  
+  document.body.appendChild(modal);
+  modal.style.display = 'block';
+  
+  // 添加关闭事件
+  modal.querySelector('.close-btn').addEventListener('click', closeErrorDetailsModal);
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) {
+      closeErrorDetailsModal();
+    }
+  });
+  
+  // 更新状态栏显示错误数量
+  const errorCount = lineErrors.filter(e => e.type === 'error').length;
+  const warningCount = lineErrors.filter(e => e.type === 'warning').length;
+  let statusMessage = `发现 ${errorCount} 个错误`;
+  if (warningCount > 0) {
+    statusMessage += `，${warningCount} 个警告`;
+  }
+  statusMessage += '，请查看详细错误信息';
+  updateStatus(statusMessage, 'error');
+}
+
+// 关闭错误详情模态框
+function closeErrorDetailsModal() {
+  const modal = document.getElementById('error-details-modal');
+  if (modal) {
+    modal.remove();
+  }
+}
+
+// 在编辑器中高亮错误
+function highlightErrorsInEditor() {
+  const modal = document.getElementById('error-details-modal');
+  if (!modal) return;
+  
+  const errorItems = modal.querySelectorAll('.error-item, .warning-item');
+  const input = document.getElementById('json-input');
+  const lines = input.value.split('\n');
+  
+  // 为每行添加错误标记
+  errorItems.forEach((item, index) => {
+    const locationText = item.querySelector('.error-location').textContent;
+    const lineMatch = locationText.match(/第 (\d+) 行/);
+    if (lineMatch) {
+      const lineNumber = parseInt(lineMatch[1]) - 1;
+      if (lineNumber >= 0 && lineNumber < lines.length) {
+        // 在行首添加错误标记
+        const errorIcon = item.querySelector('.error-icon').textContent;
+        const errorType = item.querySelector('.error-type').textContent;
+        lines[lineNumber] = `// ${errorIcon} ${errorType}: ${item.querySelector('.error-message').textContent} ← ${lines[lineNumber]}`;
+      }
+    }
+  });
+  
+  // 更新编辑器内容
+  input.value = lines.join('\n');
+  updateCharCount();
+  
+  // 关闭模态框
+  closeErrorDetailsModal();
+  
+  // 显示成功消息
+  updateStatus('已在编辑器中标记错误位置', 'success');
 }
 
 // 解析转义字符串
@@ -707,8 +962,18 @@ function parseEscapedString() {
           errorMessage = 'JSON解析错误: ' + e.message;
         }
       } else if (JsonUtils.looksLikeJson(jsonString)) {
-        errorMessage = 'JSON格式错误，请检查语法后再试';
-        console.log('⚠️ 看起来像JSON但格式错误');
+        // 看起来像JSON但格式错误，进行详细的错误分析
+        console.log('⚠️ 看起来像JSON但格式错误，开始详细错误分析...');
+        
+        const errorAnalysis = JsonUtils.analyzeJsonErrors(jsonString);
+        if (errorAnalysis.lineErrors && errorAnalysis.lineErrors.length > 0) {
+          console.log('🔍 发现具体错误，显示详细错误信息');
+          showDetailedErrors(errorAnalysis.lineErrors);
+          return;
+        } else {
+          errorMessage = 'JSON格式错误，请检查语法后再试';
+          console.log('⚠️ 无法确定具体错误位置');
+        }
       } else {
         console.log('❌ 输入不像JSON格式');
       }
@@ -747,11 +1012,23 @@ function minifyJSON() {
         LineNumberManager.updateLineNumbersStatic();
       }, 10);
     } else {
-      updateStatus(`压缩错误: ${result.error}`, 'error');
+      // 压缩失败，进行详细的错误分析
+      const errorAnalysis = JsonUtils.analyzeJsonErrors(jsonString);
+      if (errorAnalysis.lineErrors && errorAnalysis.lineErrors.length > 0) {
+        showDetailedErrors(errorAnalysis.lineErrors);
+      } else {
+        updateStatus(`压缩错误: ${result.error}`, 'error');
+      }
     }
     updateCharCount();
   } catch (error) {
-    updateStatus(`压缩错误: ${error.message}`, 'error');
+    // 捕获到异常，进行详细的错误分析
+    const errorAnalysis = JsonUtils.analyzeJsonErrors(jsonString);
+    if (errorAnalysis.lineErrors && errorAnalysis.lineErrors.length > 0) {
+      showDetailedErrors(errorAnalysis.lineErrors);
+    } else {
+      updateStatus(`压缩错误: ${error.message}`, 'error');
+    }
   }
 }
 
@@ -1165,6 +1442,39 @@ function convertToCsv() {
     updateStatus('已转换为CSV并下载', 'success');
   } catch (error) {
     updateStatus(`转换错误: ${error.message}`, 'error');
+  }
+}
+
+// 自动保存格式化后的JSON
+async function autoSaveFormattedJson(formattedJson) {
+  try {
+    // 检查是否启用自动保存
+    if (!autoSaveEnabled) return;
+    
+    // 检查距离上次自动保存的时间间隔（避免频繁保存）
+    const now = Date.now();
+    if (now - lastAutoSaveTime < 5000) { // 5秒内不重复保存
+      return;
+    }
+    
+    // 生成自动保存标题
+    const timestamp = new Date().toLocaleString('zh-CN');
+    const title = `自动保存_${timestamp}`;
+    
+    // 保存数据
+    const result = await dataManager.saveJsonData(title, formattedJson);
+    
+    if (result.success) {
+      lastAutoSaveTime = now;
+      updateStatus(`已自动保存格式化后的JSON：${title}`, 'success');
+      
+      // 触发历史数据刷新
+      const event = new CustomEvent('historyDataChanged');
+      document.dispatchEvent(event);
+    }
+  } catch (error) {
+    console.error('自动保存失败:', error);
+    // 自动保存失败不显示错误提示，避免影响用户体验
   }
 }
 

@@ -69,10 +69,14 @@ class DataManager {
       // 添加到数据列表
       savedData.unshift(newItem);
 
-      // 限制保存条数
+      // 限制保存条数，严格按照设置执行
       if (savedData.length > settings.maxSavedItems) {
+        // 移除超出限制的最旧数据
         savedData.splice(settings.maxSavedItems);
       }
+
+      // 按时间倒序排序（最新的在前面）
+      savedData.sort((a, b) => b.timestamp - a.timestamp);
 
       // 保存到存储
       await this.setSavedData(savedData);
