@@ -197,6 +197,42 @@ body {
   animation: fadeIn 0.3s forwards;
 }
 
+/* 存储信息按钮特定的工具提示样式 - 位置在下方 */
+.storage-info-btn[title]:hover::after {
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: rgba(0, 0, 0, 0.9);
+  color: white;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  white-space: nowrap;
+  z-index: 1000;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(4px);
+  max-width: 200px;
+}
+
+/* 为存储按钮工具提示添加箭头指向上方 */
+.storage-info-btn[title]:hover::before {
+  content: '';
+  position: absolute;
+  top: calc(100% + 2px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-bottom: 6px solid rgba(0, 0, 0, 0.9);
+  z-index: 1001;
+  pointer-events: none;
+  opacity: 0;
+  animation: fadeIn 0.3s forwards;
+}
+
 @keyframes fadeIn {
   to {
     opacity: 1;

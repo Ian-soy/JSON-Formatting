@@ -802,14 +802,14 @@ function updateStorageButton(usage) {
   
   // 更新tooltip为更详细的信息
   const remainingBytes = usage.quotaBytes - usage.usedBytes;
-  const tooltipText = `💾 存储使用情况:
+  const tooltipText = `:
 • 已使用: ${usage.formatted.used}
 • 可用空间: ${dataManager.formatSize(remainingBytes)}
 • 总配额: ${usage.formatted.quota}
 • 使用率: ${usage.formatted.percentage}
 
 💡 点击查看详细信息和管理选项`;
-  storageBtn.title = tooltipText;
+  storageBtn.title = '查看存储使用情况';
 }
 
 /**
