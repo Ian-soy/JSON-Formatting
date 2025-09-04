@@ -197,6 +197,44 @@ class DataManager {
   }
 
   /**
+   * 更新数据项标题
+   * @param {string} id - 数据项ID
+   * @param {string} newTitle - 新标题
+   * @returns {Object} 更新结果
+   */
+  async updateItemTitle(id, newTitle) {
+    try {
+      const savedData = await this.getSavedData();
+      const itemIndex = savedData.findIndex(item => item.id === id);
+      
+      if (itemIndex === -1) {
+        return { success: false, error: '数据不存在' };
+      }
+      
+      // 检查标题是否重复（排除当前项目）
+      const titleExists = savedData.some(item => 
+        item.title === newTitle.trim() && item.id !== id
+      );
+      
+      if (titleExists) {
+        return { success: false, error: '标题已存在，请使用不同的标题' };
+      }
+      
+      // 更新标题
+      savedData[itemIndex].title = newTitle.trim();
+      savedData[itemIndex].updatedAt = new Date().toISOString();
+      
+      // 保存更新后的数据
+      await this.setSavedData(savedData);
+      
+      return { success: true, data: savedData[itemIndex] };
+    } catch (error) {
+      console.error('更新数据项标题失败:', error);
+      return { success: false, error: '更新失败，请重试' };
+    }
+  }
+
+  /**
    * 根据ID获取数据项
    * @param {string} id - 数据项ID
    * @returns {Object|null} 数据项或null

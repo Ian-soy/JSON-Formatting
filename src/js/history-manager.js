@@ -112,6 +112,9 @@ class HistoryManager {
       <div class="history-item-header">
         <div class="history-item-title" title="${this.escapeHtml(item.title)}">${this.escapeHtml(item.title)}</div>
         <div class="history-item-actions">
+          <button class="btn secondary edit-btn">
+            ${IconManager.getIcon('edit')}
+          </button>
           <button class="btn danger delete-btn">
             ${IconManager.getIcon('delete')}
           </button>
@@ -135,12 +138,12 @@ class HistoryManager {
    * @param {Object} item - 数据项
    */
   bindHistoryItemEvents(element, item) {
-    // 点击加载数据
-    const loadBtn = element.querySelector('.load-btn');
-    if (loadBtn) {
-      loadBtn.addEventListener('click', (e) => {
+    // 点击编辑按钮
+    const editBtn = element.querySelector('.edit-btn');
+    if (editBtn) {
+      editBtn.addEventListener('click', (e) => {
         e.stopPropagation();
-        this.loadHistoryItem(item);
+        this.editHistoryItemTitle(item, element);
       });
     }
 
@@ -196,6 +199,139 @@ class HistoryManager {
       if (typeof updateStatus === 'function') {
         updateStatus('加载数据失败，请重试', 'error');
       }
+    }
+  }
+
+  /**
+   * 编辑历史数据项标题
+   * @param {Object} item - 数据项
+   * @param {HTMLElement} element - 历史数据项元素
+   */
+  async editHistoryItemTitle(item, element) {
+    const titleElement = element.querySelector('.history-item-title');
+    const currentTitle = item.title;
+    
+    // 创建编辑输入框
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = currentTitle;
+    input.className = 'title-edit-input';
+    input.maxLength = 50;
+    input.style.cssText = `
+      width: 100%;
+      padding: 4px 8px;
+      border: 1px solid var(--accent-color);
+      border-radius: 4px;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      font-size: 14px;
+      font-family: inherit;
+      outline: none;
+    `;
+    
+    // 替换标题元素
+    titleElement.style.display = 'none';
+    titleElement.parentNode.insertBefore(input, titleElement);
+    input.focus();
+    input.select();
+    
+    // 保存编辑
+    const saveEdit = async () => {
+      const newTitle = input.value.trim();
+      
+      // 验证标题
+      const validation = await this.validateTitle(newTitle, item.id);
+      if (!validation.valid) {
+        // 显示错误提示
+        input.style.borderColor = 'var(--error-color)';
+        if (typeof updateStatus === 'function') {
+          updateStatus(validation.error, 'error');
+        }
+        input.focus();
+        return;
+      }
+      
+      try {
+        // 更新数据
+        const result = await this.dataManager.updateItemTitle(item.id, newTitle);
+        
+        if (result.success) {
+          // 更新UI
+          titleElement.textContent = newTitle;
+          titleElement.title = newTitle;
+          titleElement.style.display = '';
+          input.remove();
+          
+          // 更新项目数据
+          item.title = newTitle;
+          
+          if (typeof updateStatus === 'function') {
+            updateStatus(`标题已更新：${newTitle}`, 'success');
+          }
+        } else {
+          throw new Error(result.error || '更新失败');
+        }
+      } catch (error) {
+        console.error('更新标题失败:', error);
+        if (typeof updateStatus === 'function') {
+          updateStatus('更新标题失败，请重试', 'error');
+        }
+        cancelEdit();
+      }
+    };
+    
+    // 取消编辑
+    const cancelEdit = () => {
+      titleElement.style.display = '';
+      input.remove();
+    };
+    
+    // 事件绑定
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        saveEdit();
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        cancelEdit();
+      }
+    });
+    
+    input.addEventListener('blur', saveEdit);
+  }
+
+  /**
+   * 验证标题的有效性和唯一性
+   * @param {string} title - 新标题
+   * @param {string} currentItemId - 当前项目 ID
+   * @returns {Object} 验证结果
+   */
+  async validateTitle(title, currentItemId) {
+    // 检查空标题
+    if (!title) {
+      return { valid: false, error: '标题不能为空' };
+    }
+    
+    // 检查标题长度
+    if (title.length > 50) {
+      return { valid: false, error: '标题长度不能超过50个字符' };
+    }
+    
+    try {
+      // 检查标题是否重复
+      const savedData = await this.dataManager.getSavedData();
+      const titleExists = savedData.some(item => 
+        item.title === title && item.id !== currentItemId
+      );
+      
+      if (titleExists) {
+        return { valid: false, error: '标题已存在，请使用不同的标题' };
+      }
+      
+      return { valid: true };
+    } catch (error) {
+      console.error('验证标题失败:', error);
+      return { valid: false, error: '验证失败，请重试' };
     }
   }
 

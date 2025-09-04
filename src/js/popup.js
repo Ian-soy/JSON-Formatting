@@ -13,7 +13,6 @@ const TOOLBAR_BUTTONS = [
   { id: 'minify-btn', title: '压缩JSON' },
   { id: 'copy-btn', title: '复制到剪贴板' },
   { id: 'download-btn', title: '下载JSON文件' },
-  { id: 'save-btn', title: '保存JSON数据' },
   { id: 'convert-btn', title: '格式转换' },
   { id: 'share-btn', title: '分享JSON' }
 ];
@@ -326,9 +325,6 @@ function initializeIcons() {
   document.querySelector('#share-btn .icon-container').innerHTML = IconManager.getIcon('share');
   
   // 新增按钮图标
-  const saveBtn = document.querySelector('#save-btn .icon-container');
-  if (saveBtn) saveBtn.innerHTML = IconManager.getIcon('save');
-  
   const settingsBtn = document.querySelector('#settings-btn .icon-container');
   if (settingsBtn) settingsBtn.innerHTML = IconManager.getIcon('settings');
   
@@ -365,7 +361,6 @@ function setupEventListeners() {
   document.getElementById('share-btn').addEventListener('click', showShareModal);
 
   // 新增功能按钮
-  document.getElementById('save-btn').addEventListener('click', showSaveModal);
   document.getElementById('settings-btn').addEventListener('click', () => settingsManager.toggleSettings());
   
   // 存储信息按钮
@@ -414,28 +409,6 @@ function setupEventListeners() {
   // 分享模态框按钮
   document.getElementById('copy-share-link').addEventListener('click', copyShareLink);
 
-  // 保存模态框按钮
-  const confirmSaveBtn = document.getElementById('confirm-save-btn');
-  if (confirmSaveBtn) {
-    confirmSaveBtn.addEventListener('click', saveCurrentData);
-  }
-
-  const cancelSaveBtn = document.getElementById('cancel-save-btn');
-  if (cancelSaveBtn) {
-    cancelSaveBtn.addEventListener('click', closeSaveModal);
-  }
-
-  // 保存模态框输入验证
-  const saveTitleInput = document.getElementById('save-title-input');
-  if (saveTitleInput) {
-    saveTitleInput.addEventListener('input', validateSaveTitle);
-    saveTitleInput.addEventListener('keypress', (e) => {
-      if (e.key === 'Enter') {
-        saveCurrentData();
-      }
-    });
-  }
-
   // 点击模态框外部关闭
   window.addEventListener('click', (e) => {
     document.querySelectorAll('.modal').forEach(modal => {
@@ -451,11 +424,6 @@ function setupEventListeners() {
     if (e.ctrlKey && e.key === 'i') {
       e.preventDefault();
       showStorageQuickInfo();
-    }
-    // Ctrl+S 保存JSON数据
-    else if (e.ctrlKey && e.key === 's') {
-      e.preventDefault();
-      showSaveModal();
     }
     // F5 刷新存储信息
     else if (e.key === 'F5' && e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {

@@ -1,5 +1,169 @@
   {
     "test_data": {
+      "user": [
+        {
+          "user_id": 1,
+          "username": "user_001",
+          "email": "user001@example.com",
+          "phone": "13800138001",
+          "registration_date": "2023-01-01T08:00:00Z",
+          "status": "active",
+          "addresses": [
+            {
+              "address_id": 101,
+              "province": "北京市",
+              "city": "北京市",
+              "district": "朝阳区",
+              "detail": "建国路88号",
+              "is_default": true
+            },
+            {
+              "address_id": 102,
+              "province": "上海市",
+              "city": "上海市",
+              "district": "浦东新区",
+              "detail": "张江高科技园区博云路2号",
+              "is_default": false
+            }
+          ],
+          "preferences": {
+            "language": "zh-CN",
+            "theme": "light",
+            "notifications": {
+              "email": true,
+              "sms": false,
+              "push": true
+            }
+          }
+        },
+        {
+          "user_id": 2,
+          "username": "user_002",
+          "email": "user002@example.com",
+          "phone": "13900139002",
+          "registration_date": "2023-01-02T09:15:00Z",
+          "status": "active",
+          "addresses": [
+            {
+              "address_id": 103,
+              "province": "广东省",
+              "city": "广州市",
+              "district": "天河区",
+              "detail": "天河路385号",
+              "is_default": true
+            }
+          ],
+          "preferences": {
+            "language": "zh-CN",
+            "theme": "dark",
+            "notifications": {
+              "email": true,
+              "sms": true,
+              "push": false
+            }
+          }
+        },
+        {
+          "user_id": 3,
+          "username": "user_003",
+          "email": "user003@example.com",
+          "phone": "13700137003",
+          "registration_date": "2023-01-03T10:30:00Z",
+          "status": "inactive",
+          "addresses": [],
+          "preferences": {
+            "language": "en-US",
+            "theme": "light",
+            "notifications": {
+              "email": false,
+              "sms": false,
+              "push": false
+            }
+          }
+        }
+      ],
+      "user1": [
+        {
+          "user_id": 1,
+          "username": "user_001",
+          "email": "user001@example.com",
+          "phone": "13800138001",
+          "registration_date": "2023-01-01T08:00:00Z",
+          "status": "active",
+          "addresses": [
+            {
+              "address_id": 101,
+              "province": "北京市",
+              "city": "北京市",
+              "district": "朝阳区",
+              "detail": "建国路88号",
+              "is_default": true
+            },
+            {
+              "address_id": 102,
+              "province": "上海市",
+              "city": "上海市",
+              "district": "浦东新区",
+              "detail": "张江高科技园区博云路2号",
+              "is_default": false
+            }
+          ],
+          "preferences": {
+            "language": "zh-CN",
+            "theme": "light",
+            "notifications": {
+              "email": true,
+              "sms": false,
+              "push": true
+            }
+          }
+        },
+        {
+          "user_id": 2,
+          "username": "user_002",
+          "email": "user002@example.com",
+          "phone": "13900139002",
+          "registration_date": "2023-01-02T09:15:00Z",
+          "status": "active",
+          "addresses": [
+            {
+              "address_id": 103,
+              "province": "广东省",
+              "city": "广州市",
+              "district": "天河区",
+              "detail": "天河路385号",
+              "is_default": true
+            }
+          ],
+          "preferences": {
+            "language": "zh-CN",
+            "theme": "dark",
+            "notifications": {
+              "email": true,
+              "sms": true,
+              "push": false
+            }
+          }
+        },
+        {
+          "user_id": 3,
+          "username": "user_003",
+          "email": "user003@example.com",
+          "phone": "13700137003",
+          "registration_date": "2023-01-03T10:30:00Z",
+          "status": "inactive",
+          "addresses": [],
+          "preferences": {
+            "language": "en-US",
+            "theme": "light",
+            "notifications": {
+              "email": false,
+              "sms": false,
+              "push": false
+            }
+          }
+        }
+      ],
       "users": [
         {
           "user_id": 1,
