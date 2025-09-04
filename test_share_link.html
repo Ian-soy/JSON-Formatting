@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>分享链接解析测试</title>
+    <meta charset="utf-8">
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; padding: 10px; border: 1px solid #ccc; }
+        .result { margin: 10px 0; padding: 10px; border-radius: 4px; }
+        .success { background-color: #d4edda; border-color: #c3e6cb; color: #155724; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; color: #721c24; }
+        .debug { background-color: #f8f9fa; border: 1px solid #dee2e6; padding: 10px; margin: 10px 0; white-space: pre-wrap; font-family: monospace; }
+        textarea { width: 100%; height: 100px; }
+        button { padding: 10px 20px; margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <h1>分享链接解析测试</h1>
+    
+    <div class="test-section">
+        <h3>测试用分享链接</h3>
+        <textarea id="test-url" placeholder="请输入分享链接...">https://json-share.vercel.app/v?data=c2hyb:~4N2~4N1test_data~4N1~4N7~4N2~4N1user~4N1~4N7~4N2~4N1name~4N1~4N7~4N1张三~4N1~4N6~4N1age~4N1~4N7~1Z~4N6~4N1city~4N1~4N7~4N1北京~4N1~4N3~4N3</textarea>
+        <br>
+        <button onclick="testShareLink()">测试解析</button>
+        <button onclick="clearResults()">清除结果</button>
+    </div>
+    
+    <div class="test-section">
+        <h3>解析结果</h3>
+        <div id="result-container"></div>
+    </div>
+    
+    <div class="test-section">
+        <h3>调试信息</h3>
+        <div id="debug-container"></div>
+    </div>
+
+    <script src="src/js/share-manager.js"></script>
+    <script>
+        // 捕获console.log输出用于调试
+        const originalLog = console.log;
+        const originalWarn = console.warn;
+        const originalError = console.error;
+        
+        let debugOutput = [];
+        
+        function captureLog(type, ...args) {
+            debugOutput.push(`[${type.toUpperCase()}] ${args.join(' ')}`);
+            // 显示到调试区域
+            updateDebugOutput();
+        }
+        
+        console.log = (...args) => {
+            originalLog(...args);
+            captureLog('log', ...args);
+        };
+        
+        console.warn = (...args) => {
+            originalWarn(...args);
+            captureLog('warn', ...args);
+        };
+        
+        console.error = (...args) => {
+            originalError(...args);
+            captureLog('error', ...args);
+        };
+        
+        function updateDebugOutput() {
+            const debugContainer = document.getElementById('debug-container');
+            debugContainer.innerHTML = `<div class="debug">${debugOutput.slice(-50).join('\n')}</div>`;
+        }
+        
+        function clearResults() {
+            document.getElementById('result-container').innerHTML = '';
+            document.getElementById('debug-container').innerHTML = '';
+            debugOutput = [];
+        }
+        
+        async function testShareLink() {
+            const url = document.getElementById('test-url').value.trim();
+            const resultContainer = document.getElementById('result-container');
+            
+            if (!url) {
+                resultContainer.innerHTML = '<div class="result error">请输入分享链接</div>';
+                return;
+            }
+            
+            // 清除之前的调试输出
+            debugOutput = [];
+            
+            try {
+                console.log('开始测试分享链接:', url);
+                
+                // 检查是否为分享链接
+                const isShare = shareManager.isShareLink(url);
+                console.log('分享链接检测结果:', isShare);
+                
+                if (!isShare) {
+                    resultContainer.innerHTML = '<div class="result error">不是有效的分享链接格式</div>';
+                    return;
+                }
+                
+                // 解析分享链接
+                const jsonData = await shareManager.getDataFromUrl(url);
+                console.log('解析结果:', jsonData);
+                
+                if (jsonData) {
+                    resultContainer.innerHTML = `
+                        <div class="result success">
+                            <h4>解析成功！</h4>
+                            <p><strong>解析结果:</strong></p>
+                            <pre>${JSON.stringify(jsonData, null, 2)}</pre>
+                        </div>
+                    `;
+                } else {
+                    resultContainer.innerHTML = '<div class="result error">解析结果为空</div>';
+                }
+                
+            } catch (error) {
+                console.error('解析失败:', error);
+                resultContainer.innerHTML = `
+                    <div class="result error">
+                        <h4>解析失败</h4>
+                        <p><strong>错误信息:</strong> ${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+        
+        // 自动测试初始链接
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                if (document.getElementById('test-url').value.trim()) {
+                    testShareLink();
+                }
+            }, 500);
+        });
+    </script>
+</body>
+</html>

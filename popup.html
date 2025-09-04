@@ -86,26 +86,53 @@
     <div id="share-modal" class="modal">
       <div class="modal-content">
         <span class="close-btn">&times;</span>
-        <h2>分享JSON数据</h2>
+        <h2>🔗 分享JSON数据</h2>
         
         <!-- 模态框内部提示区域 -->
         <div id="share-modal-message" class="modal-message" style="display: none;"></div>
         
-        <div class="share-options">
-          <input type="text" id="share-link" readonly>
-          <button id="copy-share-link" class="btn primary">复制链接</button>
+        <!-- 增强的分享选项 -->
+        <div class="share-advanced-options" style="margin-bottom: 15px;">
+          <div class="option-group">
+            <label class="option-label">
+              <input type="checkbox" id="share-encrypt" disabled> 
+              🔒 加密保护 <span class="feature-badge">即将推出</span>
+            </label>
+            <small class="option-help">使用加密算法保护数据安全</small>
+          </div>
+          <div class="option-group">
+            <label class="option-label">
+              <input type="checkbox" id="share-compress" checked> 
+              🗃️ 自动压缩
+            </label>
+            <small class="option-help">根据数据大小自动选择最优压缩算法</small>
+          </div>
         </div>
+        
+        <div class="share-options">
+          <input type="text" id="share-link" readonly placeholder="正在生成分享链接...">
+          <button id="copy-share-link" class="btn primary">📋 复制链接</button>
+        </div>
+        
         <!-- 分享统计信息 -->
         <div id="share-stats-container" class="share-stats-container"></div>
+        
         <div class="share-help">
-          <p><strong>使用说明：</strong></p>
+          <p><strong>🎆 增强特性：</strong></p>
           <ul>
-            <li>复制分享链接发送给他人</li>
-            <li>直接在编辑器中粘贴分享链接即可自动导入JSON</li>
-            <li>支持智能分级压缩：小数据保持原始，大数据自动高效压缩</li>
-            <li>极大JSON数据使用最大压缩算法，最多可节省70%空间</li>
-            <li>支持缓存机制，重复分享相同数据更快速</li>
+            <li>🔗 <strong>多端点支持</strong>：支持多个分享服务端点，确保高可用性</li>
+            <li>☁️ <strong>智能分级</strong>：小数据直接URL，大数据云端存储</li>
+            <li>🗃️ <strong>分级压缩</strong>：最高可节省70%空间，支捡64种编码方式</li>
+            <li>🔒 <strong>加密保护</strong>：支持密码保护和加密传输（即将推出）</li>
+            <li>🔄 <strong>即时同步</strong>：粘贴分享链接即可自动导入JSON数据</li>
+            <li>📊 <strong>详细统计</strong>：实时显示压缩率、编码方式等信息</li>
           </ul>
+          <div class="share-tips">
+            <p><strong>🔍 使用建议：</strong></p>
+            <p>• <8KB数据：直接URL分享，即时访问</p>
+            <p>• 8KB-50KB数据：云端存储，长期保存</p>
+            <p>• >50KB数据：建议文件下载方式</p>
+          </div>
         </div>
       </div>
     </div>

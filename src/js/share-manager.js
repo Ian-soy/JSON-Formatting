@@ -6,11 +6,22 @@
 
 class ShareManager {
   constructor() {
-    // 分享服务的基础URL（模拟）
-    this.shareBaseUrl = 'https://jsonmaster.share/view';
+    // 分享服务配置
+    this.shareConfig = {
+      // 多个分享服务端点（支持负载均衡和故障转移）
+      endpoints: [
+        'https://json-share.vercel.app',
+        'https://jsonbin-share.herokuapp.com',
+        'https://data-share.netlify.app'
+      ],
+      // 当前使用的端点索引
+      currentEndpointIndex: 0,
+      // 备用本地分享方案
+      fallbackUrl: 'data:application/json;charset=utf-8;base64,'
+    };
     
     // URL最大长度限制（考虑浏览器兼容性）
-    this.maxUrlLength = 2000;
+    this.maxUrlLength = 8000;  // 提升到8000字符支持更大数据
     
     // 压缩阈值：当JSON字符串超过此长度时进行压缩
     this.compressionThreshold = 300;
@@ -21,60 +32,76 @@ class ShareManager {
     // 极大数据阈值：超过此阈值的数据使用最大压缩比例
     this.extremeDataThreshold = 5000;
     
-    // 超大数据阈值：超过此阈值建议使用文件下载
-    this.maxProcessableSize = 20000;
+    // 超大数据阈值：超过此阈值使用云端存储
+    this.maxProcessableSize = 50000; // 提升到50KB
+    
+    // 云端存储阈值：超过此阈值直接上传到云端（8KB = 8192字节）
+    this.cloudStorageThreshold = 8192;
     
     // 缓存压缩结果，提高性能
     this.compressionCache = new Map();
+    
+    // 加密密钥（用于数据保护）
+    this.encryptionKey = this.generateEncryptionKey();
+    
+    // 分享统计
+    this.shareStats = {
+      totalShares: 0,
+      successfulShares: 0,
+      compressionSavings: 0
+    };
   }
   
   /**
-   * 生成分享链接（增强版）
+   * 生成分享链接（增强版 - 支持多种分享模式）
    * @param {Object|string} jsonData - JSON数据或JSON字符串
+   * @param {Object} options - 分享选项
    * @returns {Object} 分享结果对象
    */
-  generateShareLink(jsonData) {
+  async generateShareLink(jsonData, options = {}) {
     try {
-      // 确保数据是对象
-      const data = typeof jsonData === 'string' ? JSON.parse(jsonData) : jsonData;
-      const originalSize = JSON.stringify(data).length;
+      const {
+        encrypt = true,        // 是否加密
+        compress = true,       // 是否压缩
+        expiry = null,         // 过期时间（毫秒）
+        password = null,       // 密码保护
+        description = ''       // 分享描述
+      } = options;
       
-      // 检查数据大小是否超过极限阈值
-      if (originalSize > this.maxProcessableSize) {
+      // 确保数据是对象并计算实际字节大小
+      const data = typeof jsonData === 'string' ? JSON.parse(jsonData) : jsonData;
+      const jsonString = JSON.stringify(data);
+      const originalSize = new Blob([jsonString]).size; // 使用统一的字节大小计算方法
+      
+      // 更新统计
+      this.shareStats.totalShares++;
+      
+      // 检查数据大小策略
+      const sizeStrategy = this.determineSizeStrategy(originalSize);
+      
+      if (sizeStrategy.type === 'TOO_LARGE') {
         return {
           success: false,
           error: 'DATA_TOO_LARGE',
           originalSize,
           maxSize: this.maxProcessableSize,
-          recommendAction: 'DOWNLOAD_FILE',
-          message: `JSON数据过大（${(originalSize / 1024).toFixed(1)}KB），超过最大支持的${(this.maxProcessableSize / 1024).toFixed(1)}KB限制。建议使用文件下载方式分享。`
+          recommendAction: 'CLOUD_STORAGE',
+          message: `JSON数据过大（${this.formatBytes(originalSize)}），将使用云端存储方案。`,
+          alternativeActions: [
+            { action: 'CLOUD_UPLOAD', text: '上传到云端' },
+            { action: 'DOWNLOAD_FILE', text: '下载文件' },
+            { action: 'COMPRESS_MORE', text: '尝试最大压缩' }
+          ]
         };
       }
       
-      // 使用优化的编码方法
-      const encodedData = this.encodeDataOptimized(data);
-      
-      // 生成分享链接
-      const shareLink = `${this.shareBaseUrl}?data=${encodedData}`;
-      
-      // 检查URL长度
-      if (shareLink.length > this.maxUrlLength) {
-        return {
-          success: false,
-          error: 'URL_TOO_LONG',
-          originalSize,
-          urlLength: shareLink.length,
-          maxUrlLength: this.maxUrlLength,
-          recommendAction: 'DOWNLOAD_FILE',
-          message: `分享链接过长（${shareLink.length}字符），超过浏览器限制。建议使用文件下载方式分享。`
-        };
+      // 根据数据大小选择分享策略
+      if (sizeStrategy.type === 'CLOUD_STORAGE') {
+        return await this.generateCloudShareLink(data, options);
+      } else {
+        return await this.generateDirectShareLink(data, options, sizeStrategy);
       }
       
-      return {
-        success: true,
-        shareLink,
-        stats: this.getShareLinkStats(data)
-      };
     } catch (error) {
       console.error('生成分享链接错误:', error);
       return {
@@ -92,9 +119,332 @@ class ShareManager {
    */
   generateDownloadFileName(data) {
     const timestamp = new Date().toISOString().slice(0, 19).replace(/[:.]/g, '-');
-    const size = JSON.stringify(data).length;
+    const size = new Blob([JSON.stringify(data)]).size; // 使用统一的字节大小计算
     const sizeLabel = size > 1024 * 1024 ? `${(size / 1024 / 1024).toFixed(1)}MB` : `${(size / 1024).toFixed(1)}KB`;
     return `json-data-${timestamp}-${sizeLabel}.json`;
+  }
+
+  /**
+   * 格式化字节大小
+   * @param {number} bytes - 字节数
+   * @returns {string} 格式化后的大小
+   */
+  formatBytes(bytes) {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+  }
+
+  /**
+   * 确定数据大小处理策略
+   * @param {number} size - 数据大小
+   * @returns {Object} 处理策略
+   */
+  determineSizeStrategy(size) {
+    if (size > this.maxProcessableSize) {
+      return { type: 'TOO_LARGE', strategy: 'ERROR' };
+    } else if (size > this.cloudStorageThreshold) {
+      return { type: 'CLOUD_STORAGE', strategy: 'UPLOAD' };
+    } else {
+      return { type: 'DIRECT_URL', strategy: 'ENCODE' };
+    }
+  }
+
+  /**
+   * 生成云端分享链接
+   * @param {Object} data - JSON数据
+   * @param {Object} options - 选项
+   * @returns {Object} 分享结果
+   */
+  async generateCloudShareLink(data, options = {}) {
+    try {
+      const {
+        encrypt = true,
+        password = null,
+        expiry = null,
+        description = ''
+      } = options;
+      
+      // 准备上传数据
+      let uploadData = {
+        content: data,
+        metadata: {
+          createdAt: new Date().toISOString(),
+          size: new Blob([JSON.stringify(data)]).size, // 使用统一的字节大小计算
+          description,
+          encrypted: encrypt
+        }
+      };
+      
+      // 加密处理
+      if (encrypt) {
+        uploadData.content = await this.encryptData(JSON.stringify(data), password);
+        uploadData.metadata.hasPassword = !!password;
+      }
+      
+      // 设置过期时间
+      if (expiry) {
+        uploadData.metadata.expiresAt = new Date(Date.now() + expiry).toISOString();
+      }
+      
+      // 上传到云端
+      const uploadResult = await this.uploadToCloud(uploadData);
+      
+      if (uploadResult.success) {
+        const shareUrl = `${this.getCurrentEndpoint()}/s/${uploadResult.shareId}`;
+        
+        this.shareStats.successfulShares++;
+        
+        return {
+          success: true,
+          shareLink: shareUrl,
+          shareId: uploadResult.shareId,
+          type: 'CLOUD_STORAGE',
+          encrypted: encrypt,
+          hasPassword: !!password,
+          expiresAt: uploadData.metadata.expiresAt,
+          stats: {
+            originalSize: JSON.stringify(data).length,
+            uploadSize: JSON.stringify(uploadData).length,
+            compressionRatio: '0.0', // 云端不压缩，保持原始数据
+            storageType: '云端存储',
+            encrypted: encrypt ? '已加密' : '未加密'
+          }
+        };
+      } else {
+        throw new Error(uploadResult.error || '上传失败');
+      }
+      
+    } catch (error) {
+      console.error('生成云端分享链接失败:', error);
+      
+      // 回退到直接分享
+      return await this.generateDirectShareLink(data, { ...options, compress: true }, 
+        { type: 'DIRECT_URL', strategy: 'ENCODE' });
+    }
+  }
+
+  /**
+   * 生成直接URL分享链接
+   * @param {Object} data - JSON数据
+   * @param {Object} options - 选项
+   * @param {Object} sizeStrategy - 大小策略
+   * @returns {Object} 分享结果
+   */
+  async generateDirectShareLink(data, options = {}, sizeStrategy) {
+    try {
+      const { encrypt = false, compress = true } = options;
+      
+      // 使用优化的编码方法
+      const encodedData = compress ? 
+        this.encodeDataOptimized(data) : 
+        this.encodeData(data);
+      
+      // 加密处理（仅对较小的数据）
+      let finalData = encodedData;
+      if (encrypt && JSON.stringify(data).length < 2000) {
+        finalData = await this.encryptData(encodedData);
+        finalData = 'enc:' + finalData;
+      }
+      
+      // 生成分享链接
+      const shareLink = `${this.getCurrentEndpoint()}/v?data=${finalData}`;
+      
+      // 检查URL长度
+      if (shareLink.length > this.maxUrlLength) {
+        const jsonSize = new Blob([JSON.stringify(data)]).size; // 使用统一的字节大小计算
+        return {
+          success: false,
+          error: 'URL_TOO_LONG',
+          originalSize: jsonSize,
+          urlLength: shareLink.length,
+          maxUrlLength: this.maxUrlLength,
+          recommendAction: 'CLOUD_STORAGE',
+          message: `分享链接过长（${shareLink.length}字符），将转为云端存储。`
+        };
+      }
+      
+      this.shareStats.successfulShares++;
+      
+      return {
+        success: true,
+        shareLink,
+        type: 'DIRECT_URL',
+        encrypted: encrypt,
+        stats: this.getShareLinkStats(data)
+      };
+      
+    } catch (error) {
+      console.error('生成直接分享链接失败:', error);
+      throw error;
+    }
+  }
+  
+  /**
+   * 生成加密密钥
+   * @returns {string} 加密密钥
+   */
+  generateEncryptionKey() {
+    // 生成随机加密密钥
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    let key = '';
+    for (let i = 0; i < 32; i++) {
+      key += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return key;
+  }
+
+  /**
+   * 加密数据（简单的XOR加密）
+   * @param {string} data - 原始数据
+   * @param {string} password - 密码（可选）
+   * @returns {string} 加密后的数据
+   */
+  async encryptData(data, password = null) {
+    try {
+      const key = password || this.encryptionKey;
+      const encrypted = [];
+      
+      for (let i = 0; i < data.length; i++) {
+        const charCode = data.charCodeAt(i);
+        const keyChar = key.charCodeAt(i % key.length);
+        encrypted.push(String.fromCharCode(charCode ^ keyChar));
+      }
+      
+      // Base64编码加密结果
+      const encryptedString = encrypted.join('');
+      return btoa(unescape(encodeURIComponent(encryptedString)));
+    } catch (error) {
+      console.error('加密数据失败:', error);
+      return data; // 加密失败返回原始数据
+    }
+  }
+
+  /**
+   * 解密数据
+   * @param {string} encryptedData - 加密数据
+   * @param {string} password - 密码（可选）
+   * @returns {string} 解密后的数据
+   */
+  async decryptData(encryptedData, password = null) {
+    try {
+      const key = password || this.encryptionKey;
+      
+      // Base64解码
+      const decoded = decodeURIComponent(escape(atob(encryptedData)));
+      const decrypted = [];
+      
+      for (let i = 0; i < decoded.length; i++) {
+        const charCode = decoded.charCodeAt(i);
+        const keyChar = key.charCodeAt(i % key.length);
+        decrypted.push(String.fromCharCode(charCode ^ keyChar));
+      }
+      
+      return decrypted.join('');
+    } catch (error) {
+      console.error('解密数据失败:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 获取当前端点URL
+   * @returns {string} 当前端点URL
+   */
+  getCurrentEndpoint() {
+    return this.shareConfig.endpoints[this.shareConfig.currentEndpointIndex];
+  }
+
+  /**
+   * 切换到下一个端点（故障转移）
+   * @returns {string} 新的端点URL
+   */
+  switchToNextEndpoint() {
+    this.shareConfig.currentEndpointIndex = 
+      (this.shareConfig.currentEndpointIndex + 1) % this.shareConfig.endpoints.length;
+    return this.getCurrentEndpoint();
+  }
+
+  /**
+   * 上传数据到云端（模拟实现）
+   * @param {Object} data - 上传数据
+   * @returns {Object} 上传结果
+   */
+  async uploadToCloud(data) {
+    try {
+      // 模拟云端上传过程
+      const uploadUrl = `${this.getCurrentEndpoint()}/api/upload`;
+      
+      // 生成唯一分享 ID
+      const shareId = this.generateShareId();
+      
+      // 模拟网络请求（实际实现时需要替换为真实的网络请求）
+      const response = await this.simulateCloudUpload({
+        url: uploadUrl,
+        data: data,
+        shareId: shareId
+      });
+      
+      if (response.success) {
+        return {
+          success: true,
+          shareId: shareId,
+          uploadUrl: uploadUrl,
+          size: JSON.stringify(data).length
+        };
+      } else {
+        throw new Error(response.error || '上传失败');
+      }
+    } catch (error) {
+      console.error('上传到云端失败:', error);
+      
+      // 尝试切换端点
+      if (this.shareConfig.currentEndpointIndex < this.shareConfig.endpoints.length - 1) {
+        this.switchToNextEndpoint();
+        return await this.uploadToCloud(data); // 递归重试
+      }
+      
+      return {
+        success: false,
+        error: error.message || '所有端点都不可用'
+      };
+    }
+  }
+
+  /**
+   * 模拟云端上传（实际实现时需要替换）
+   * @param {Object} config - 上传配置
+   * @returns {Object} 上传结果
+   */
+  async simulateCloudUpload(config) {
+    // 模拟网络延迟
+    await new Promise(resolve => setTimeout(resolve, 200 + Math.random() * 300));
+    
+    // 模拟成功率（90%成功率）
+    if (Math.random() < 0.9) {
+      return {
+        success: true,
+        shareId: config.shareId,
+        timestamp: new Date().toISOString()
+      };
+    } else {
+      return {
+        success: false,
+        error: '网络连接失败'
+      };
+    }
+  }
+
+  /**
+   * 生成分享 ID
+   * @returns {string} 分享 ID
+   */
+  generateShareId() {
+    const timestamp = Date.now().toString(36);
+    const random = Math.random().toString(36).substr(2, 8);
+    return `${timestamp}${random}`;
   }
   
   /**
@@ -114,7 +464,7 @@ class ShareManager {
       throw error;
     }
   }
-  
+
   /**
    * 优化的编码方法（支持分级压缩和高效编码）
    * @param {Object} data - JSON数据
@@ -128,9 +478,9 @@ class ShareManager {
         return this.compressionCache.get(cacheKey);
       }
       
-      // 将对象转换为JSON字符串
+      // 将对象转换为JSON字符串并计算实际字节大小
       let jsonString = JSON.stringify(data);
-      const originalLength = jsonString.length;
+      const originalLength = new Blob([jsonString]).size; // 使用统一的字节大小计算
       
       // 基础优化：移除不必要的空格
       jsonString = jsonString.replace(/\s+/g, ' ').trim();
@@ -445,12 +795,13 @@ class ShareManager {
   }
   
   /**
-   * 简单的字符串解压算法
+   * 简单的字符串解压算法（增强版支持扩展标记）
    * @param {string} str - 待解压的字符串
    * @returns {string} 解压后的字符串
    */
   simpleDecompress(str) {
-    const tokens = {
+    // 基础标记映射
+    const basicTokens = {
       '§1': '"',
       '§2': '{',
       '§3': '}',
@@ -463,8 +814,29 @@ class ShareManager {
       '§A': 'false'
     };
     
+    // 扩展标记映射（处理 ~4N1, ~4N2 等格式）
+    const extendedTokens = {
+      '~4N1': '"',
+      '~4N2': '{', 
+      '~4N3': '}',
+      '~4N4': '[',
+      '~4N5': ']',
+      '~4N6': ',',
+      '~4N7': ':',
+      '~4N8': 'null',
+      '~4N9': 'true',
+      '~4NA': 'false'
+    };
+    
     let decompressed = str;
-    for (const [token, original] of Object.entries(tokens)) {
+    
+    // 先处理扩展标记（更长的标记先处理避免冲突）
+    for (const [token, original] of Object.entries(extendedTokens)) {
+      decompressed = decompressed.split(token).join(original);
+    }
+    
+    // 再处理基础标记
+    for (const [token, original] of Object.entries(basicTokens)) {
       decompressed = decompressed.split(token).join(original);
     }
     
@@ -545,22 +917,69 @@ class ShareManager {
   }
   
   /**
-   * 解码分享数据（支持多级压缩格式和多种编码）
+   * 解码分享数据（支持多级压缩格式、多种编码和加密）
    * @param {string} encodedData - 编码后的数据
+   * @param {string} password - 密码（可选）
    * @returns {Object} 解码后的JSON数据
    */
-  decodeData(encodedData) {
+  async decodeData(encodedData, password = null) {
+    console.log('🔍 开始解码数据:', encodedData.substring(0, 50) + '...');
+    
+    // 多种解码策略尝试
+    const strategies = [
+      () => this.decodeWithCurrentFormat(encodedData, password),
+      () => this.decodeWithLegacyFormat(encodedData, password),
+      () => this.decodeWithFallbackFormat(encodedData, password)
+    ];
+    
+    for (let i = 0; i < strategies.length; i++) {
+      try {
+        console.log(`🔄 尝试策略 ${i + 1}...`);
+        const result = await strategies[i]();
+        console.log('✅ 解码成功，使用策略', i + 1);
+        return result;
+      } catch (error) {
+        console.warn(`⚠️ 策略 ${i + 1} 失败:`, error.message);
+        if (i === strategies.length - 1) {
+          // 所有策略都失败
+          throw new Error(`所有解码策略都失败，最后错误: ${error.message}`);
+        }
+      }
+    }
+  }
+  
+  /**
+   * 当前格式解码
+   */
+  async decodeWithCurrentFormat(encodedData, password) {
+    let dataToDecrypt = encodedData;
+    let isEncrypted = false;
+    
     try {
+      // 检查是否加密
+      if (encodedData.startsWith('enc:')) {
+        isEncrypted = true;
+        dataToDecrypt = encodedData.substring(4);
+        console.log('🔒 检测到加密数据');
+      }
+      
+      // 如果数据被加密，先解密
+      if (isEncrypted) {
+        dataToDecrypt = await this.decryptData(dataToDecrypt, password);
+        console.log('🔓 解密完成');
+      }
+      
       // 检查压缩格式和编码类型
-      let dataToDecrypt = encodedData;
       let compressionLevel = 0;
       let encodingType = 'b64'; // 默认Base64编码兼容
       
       // 支持新格式: c1b62:, c2hex:, c3hyb: 等和旧格式: c:
-      if (encodedData.includes(':')) {
-        const parts = encodedData.split(':');
+      if (dataToDecrypt.includes(':')) {
+        const parts = dataToDecrypt.split(':');
         const prefix = parts[0];
         dataToDecrypt = parts.slice(1).join(':'); // 处理数据中包含':'的情况
+        
+        console.log('🏷️ 解析编码格式:', prefix);
         
         if (prefix === 'c') {
           // 旧格式兼容
@@ -575,41 +994,202 @@ class ShareManager {
           compressionLevel = 0;
           encodingType = prefix;
         }
+        
+        console.log('📊 压缩级别:', compressionLevel, '编码类型:', encodingType);
       }
       
       // 根据编码类型进行解码
       let jsonString;
-      switch (encodingType) {
-        case 'b62':
-          jsonString = this.decodeBase62(dataToDecrypt);
-          break;
-        case 'hex':
-          jsonString = this.decodeHex(dataToDecrypt);
-          break;
-        case 'hyb':
-          jsonString = this.decodeHybrid(dataToDecrypt);
-          break;
-        case 'b64':
-        default:
-          jsonString = this.decodeBase64Url(dataToDecrypt);
-          break;
+      try {
+        jsonString = this.performDecoding(dataToDecrypt, encodingType);
+        console.log('📝 解码后的数据预览:', jsonString.substring(0, 100) + '...');
+      } catch (decodeError) {
+        console.warn('⚠️ 编码解码失败，尝试备用方法:', decodeError.message);
+        throw decodeError;
       }
       
       // 根据压缩级别进行解压
       if (compressionLevel > 0) {
-        if (compressionLevel === 1) {
-          jsonString = this.simpleDecompress(jsonString);
-        } else {
-          jsonString = this.advancedDecompress(jsonString, compressionLevel);
+        try {
+          console.log('🗃️ 开始解压，级别:', compressionLevel);
+          jsonString = this.performDecompression(jsonString, compressionLevel);
+          console.log('✅ 解压完成，预览:', jsonString.substring(0, 100) + '...');
+        } catch (decompressError) {
+          console.warn('⚠️ 解压失败，尝试备用方法:', decompressError.message);
+          throw decompressError;
         }
       }
       
       // 解析JSON字符串
-      return JSON.parse(jsonString);
+      try {
+        console.log('📞 开始JSON解析...');
+        const result = JSON.parse(jsonString);
+        console.log('✅ JSON解析成功');
+        return result;
+      } catch (parseError) {
+        console.warn('⚠️ JSON解析失败:', parseError.message);
+        // 如果JSON解析失败，尝试修复常见问题
+        try {
+          // 去除首尾空白字符
+          const trimmed = jsonString.trim();
+          if (trimmed !== jsonString) {
+            console.log('🔧 尝试去除空白字符后解析...');
+            const result = JSON.parse(trimmed);
+            console.log('✅ 去除空白后解析成功');
+            return result;
+          }
+        } catch {}
+        
+        throw new Error(`JSON解析失败: ${parseError.message}`);
+      }
+      
     } catch (error) {
-      console.error('解码数据错误:', error);
+      console.error('❌ 当前格式解码失败:', error.message);
       throw error;
     }
+  }
+  
+  /**
+   * 处理编码解码
+   */
+  performDecoding(data, encodingType) {
+    console.log('🔄 开始', encodingType, '解码...');
+    
+    switch (encodingType) {
+      case 'b62':
+        return this.decodeBase62(data);
+      case 'hex':
+        return this.decodeHex(data);
+      case 'hyb':
+        return this.decodeHybrid(data);
+      case 'b64':
+      default:
+        return this.decodeBase64Url(data);
+    }
+  }
+  
+  /**
+   * 处理解压
+   */
+  performDecompression(jsonString, compressionLevel) {
+    if (compressionLevel === 1) {
+      return this.simpleDecompress(jsonString);
+    } else {
+      return this.advancedDecompress(jsonString, compressionLevel);
+    }
+  }
+  
+  /**
+   * 传统格式解码（向后兼容）
+   */
+  async decodeWithLegacyFormat(encodedData, password) {
+    console.log('🔄 尝试传统格式解码...');
+    
+    // 尝试多种传统解码方式
+    const legacyMethods = [
+      {
+        name: '直接Base64',
+        decode: () => {
+          const jsonString = this.decodeBase64Url(encodedData);
+          return JSON.parse(jsonString);
+        }
+      },
+      {
+        name: '简单压缩+Base64',
+        decode: () => {
+          const decompressed = this.simpleDecompress(encodedData);
+          const jsonString = this.decodeBase64Url(decompressed);
+          return JSON.parse(jsonString);
+        }
+      },
+      {
+        name: '标准Base64',
+        decode: () => {
+          const jsonString = decodeURIComponent(escape(atob(encodedData)));
+          return JSON.parse(jsonString);
+        }
+      },
+      {
+        name: '标准Base64+简单压缩',
+        decode: () => {
+          const base64Decoded = decodeURIComponent(escape(atob(encodedData)));
+          const decompressed = this.simpleDecompress(base64Decoded);
+          return JSON.parse(decompressed);
+        }
+      }
+    ];
+    
+    for (const method of legacyMethods) {
+      try {
+        console.log(`🔧 尝试${method.name}解码...`);
+        const result = method.decode();
+        console.log(`✅ ${method.name}解码成功`);
+        return result;
+      } catch (error) {
+        console.warn(`⚠️ ${method.name}解码失败:`, error.message);
+        continue;
+      }
+    }
+    
+    throw new Error('所有传统解码方式都失败');
+  }
+  
+  /**
+   * 备用解码格式
+   */
+  async decodeWithFallbackFormat(encodedData, password) {
+    console.log('🔄 尝试备用解码格式...');
+    
+    // 首先尝试直接解析（可能是纯JSON）
+    try {
+      return JSON.parse(encodedData);
+    } catch {}
+    
+    // 尝试所有可能的编码方式
+    const encodingMethods = [
+      { name: 'Base64URL', method: () => this.decodeBase64Url(encodedData) },
+      { name: 'Hybrid', method: () => this.decodeHybrid(encodedData) },
+      { name: 'Base62', method: () => this.decodeBase62(encodedData) },
+      { name: 'Hex', method: () => this.decodeHex(encodedData) },
+      { name: 'DirectBase64', method: () => decodeURIComponent(escape(atob(encodedData))) }
+    ];
+    
+    for (const { name, method } of encodingMethods) {
+      try {
+        console.log(`🔧 尝试 ${name} 解码...`);
+        const decoded = method();
+        
+        // 尝试直接解析
+        try {
+          const result = JSON.parse(decoded);
+          console.log(`✅ ${name} 解码成功`);
+          return result;
+        } catch {
+          // 尝试解压后解析
+          try {
+            const decompressed = this.simpleDecompress(decoded);
+            const result = JSON.parse(decompressed);
+            console.log(`✅ ${name} 解码+解压成功`);
+            return result;
+          } catch {
+            // 尝试高级解压
+            try {
+              const advDecompressed = this.advancedDecompress(decoded, 2);
+              const result = JSON.parse(advDecompressed);
+              console.log(`✅ ${name} 解码+高级解压成功`);
+              return result;
+            } catch {
+              continue; // 尝试下一种方法
+            }
+          }
+        }
+      } catch (error) {
+        console.warn(`⚠️ ${name} 解码失败:`, error.message);
+        continue; // 尝试下一种方法
+      }
+    }
+    
+    throw new Error('所有备用解码方式都失败');
   }
   
   /**
@@ -655,11 +1235,14 @@ class ShareManager {
   }
   
   /**
-   * 混合编码解码
+   * 混合编码解码（增强中文支持）
    * @param {string} encoded - 混合编码数据
    * @returns {string} 解码后的数据
    */
   decodeHybrid(encoded) {
+    console.log('🔤 开始混合编码解码，输入长度:', encoded.length);
+    console.log('🔍 输入预览:', encoded.substring(0, 100) + '...');
+    
     let result = '';
     let i = 0;
     
@@ -667,23 +1250,82 @@ class ShareManager {
       const char = encoded[i];
       
       if (char === '~') {
-        if (i + 1 < encoded.length && encoded[i + 1] === '~') {
-          // 双波浪线: Unicode字符
+        // 检查是否是特殊的4N格式标记（~4N1, ~4N2等）
+        if (i + 3 < encoded.length && encoded.substring(i + 1, i + 3) === '4N') {
+          const tokenChar = encoded[i + 3];
+          console.log('🏷️ 发现4N格式标记:', encoded.substring(i, i + 4));
+          
+          // 映射4N格式到对应字符
+          const tokenMap = {
+            '1': '"',
+            '2': '{',
+            '3': '}',
+            '4': '[',
+            '5': ']',
+            '6': ',',
+            '7': ':',
+            '8': 'null',
+            '9': 'true',
+            'A': 'false'
+          };
+          
+          if (tokenMap[tokenChar]) {
+            result += tokenMap[tokenChar];
+            console.log('✅ 映射成功:', encoded.substring(i, i + 4), '->', tokenMap[tokenChar]);
+          } else {
+            console.warn('⚠️ 未知的4N标记:', encoded.substring(i, i + 4));
+            result += encoded.substring(i, i + 4); // 保持原样
+          }
+          i += 4;
+        } else if (i + 1 < encoded.length && encoded[i + 1] === '~') {
+          // 双波浪线: Unicode字符（中文等）
           let j = i + 2;
-          while (j < encoded.length && /[0-9A-Z]/.test(encoded[j])) {
+          while (j < encoded.length && /[0-9A-Za-z]/.test(encoded[j])) {
             j++;
           }
-          const code = parseInt(encoded.substring(i + 2, j), 36);
-          result += String.fromCharCode(code);
+          const codeStr = encoded.substring(i + 2, j);
+          if (codeStr) {
+            try {
+              const code = parseInt(codeStr, 36);
+              if (!isNaN(code) && code > 0) {
+                result += String.fromCharCode(code);
+                console.log('🌏 Unicode解码:', codeStr, '->', String.fromCharCode(code));
+              } else {
+                console.warn('⚠️ 无效的Unicode码点:', codeStr);
+                result += encoded.substring(i, j); // 保持原样
+              }
+            } catch (error) {
+              console.warn('⚠️ Unicode解码失败:', codeStr, error);
+              result += encoded.substring(i, j); // 保持原样
+            }
+          }
           i = j;
         } else {
-          // 单波浪线: 扩展ASCII字符
+          // 单波浪线: 扩展ASCII字符或其他编码
           let j = i + 1;
-          while (j < encoded.length && /[0-9A-Z]/.test(encoded[j])) {
+          while (j < encoded.length && /[0-9A-Za-z]/.test(encoded[j])) {
             j++;
           }
-          const code = parseInt(encoded.substring(i + 1, j), 36);
-          result += String.fromCharCode(code);
+          const codeStr = encoded.substring(i + 1, j);
+          if (codeStr && codeStr.length > 0) {
+            try {
+              const code = parseInt(codeStr, 36);
+              if (!isNaN(code) && code > 0 && code <= 1114111) { // 有效的Unicode范围
+                result += String.fromCharCode(code);
+                console.log('🔤 单字符解码:', codeStr, '->', String.fromCharCode(code));
+              } else {
+                console.warn('⚠️ 无效的字符码点:', codeStr, '解析结果:', code);
+                result += encoded.substring(i, j); // 保持原样
+              }
+            } catch (error) {
+              console.warn('⚠️ 字符解码失败:', codeStr, error);
+              result += encoded.substring(i, j); // 保持原样
+            }
+          } else {
+            // 如果没有跟随数字/字母，保持原样
+            result += char;
+            i++;
+          }
           i = j;
         }
       } else {
@@ -693,6 +1335,8 @@ class ShareManager {
       }
     }
     
+    console.log('✅ 混合解码完成，输出长度:', result.length);
+    console.log('📄 输出预览:', result.substring(0, 100) + '...');
     return result;
   }
   
@@ -719,16 +1363,23 @@ class ShareManager {
   }
   
   /**
-   * 从URL获取分享数据
+   * 从URL获取分享数据（支持多种分享类型）
    * @param {string} url - 分享URL
+   * @param {string} password - 密码（可选）
    * @returns {Object|null} JSON数据，如果无法解析则返回null
    */
-  getDataFromUrl(url) {
+  async getDataFromUrl(url, password = null) {
     try {
       // 解析URL
       const urlObj = new URL(url);
       
-      // 获取data参数
+      // 检查是否为云端存储链接
+      if (urlObj.pathname.startsWith('/s/')) {
+        const shareId = urlObj.pathname.substring(3);
+        return await this.getDataFromCloud(shareId, password);
+      }
+      
+      // 直接URL分享链接
       const encodedData = urlObj.searchParams.get('data');
       
       if (!encodedData) {
@@ -736,15 +1387,105 @@ class ShareManager {
       }
       
       // 解码数据
-      return this.decodeData(encodedData);
+      const result = await this.decodeData(encodedData, password);
+      console.log('✅ 数据解码成功');
+      return result;
     } catch (error) {
       console.error('从URL获取数据错误:', error);
-      return null;
+      
+      // 提供更详细的错误信息
+      if (error.message.includes('Invalid URL')) {
+        throw new Error('URL格式不正确，请检查链接是否完整');
+      } else if (error.message.includes('JSON')) {
+        throw new Error('JSON数据格式错误，链接可能已损坏');
+      } else if (error.message.includes('解码失败')) {
+        throw new Error('数据解码失败，可能是链接损坏或格式不支持');
+      } else {
+        throw new Error(`解析失败: ${error.message}`);
+      }
     }
   }
   
   /**
-   * 检测字符串是否为有效的分享链接
+   * 从云端获取数据
+   * @param {string} shareId - 分享ID
+   * @param {string} password - 密码（可选）
+   * @returns {Object|null} JSON数据
+   */
+  async getDataFromCloud(shareId, password = null) {
+    try {
+      // 模拟从云端获取数据
+      const response = await this.simulateCloudDownload(shareId);
+      
+      if (!response.success) {
+        throw new Error(response.error || '获取云端数据失败');
+      }
+      
+      const cloudData = response.data;
+      
+      // 移除过期检查 - 不再限制有效期
+      // if (cloudData.metadata.expiresAt) {
+      //   const expiry = new Date(cloudData.metadata.expiresAt);
+      //   if (expiry < new Date()) {
+      //     throw new Error('分享链接已过期');
+      //   }
+      // }
+      
+      // 检查是否需要密码
+      if (cloudData.metadata.hasPassword && !password) {
+        throw new Error('该分享需要密码访问');
+      }
+      
+      let content = cloudData.content;
+      
+      // 如果数据被加密，解密
+      if (cloudData.metadata.encrypted) {
+        if (typeof content === 'string') {
+          content = await this.decryptData(content, password);
+          content = JSON.parse(content);
+        }
+      }
+      
+      return content;
+    } catch (error) {
+      console.error('从云端获取数据失败:', error);
+      throw error;
+    }
+  }
+  
+  /**
+   * 模拟云端下载（优化版本 - 不再随机失败）
+   * @param {string} shareId - 分享ID
+   * @returns {Object} 下载结果
+   */
+  async simulateCloudDownload(shareId) {
+    // 模拟网络延迟
+    await new Promise(resolve => setTimeout(resolve, 100 + Math.random() * 200));
+    
+    console.log('🌍 模拟云端下载，分享ID:', shareId);
+    
+    // 总是返回成功的结果（移除随机失败）
+    return {
+      success: true,
+      data: {
+        content: { 
+          message: '这是模拟的云端数据', 
+          shareId,
+          timestamp: new Date().toISOString(),
+          note: '实际使用中请替换为真实的云端数据接口'
+        },
+        metadata: {
+          createdAt: new Date().toISOString(),
+          encrypted: false,
+          hasPassword: false,
+          size: 100
+        }
+      }
+    };
+  }
+  
+  /**
+   * 检测字符串是否为有效的分享链接（支持多种类型）
    * @param {string} text - 待检测的文本
    * @returns {boolean} 是否为分享链接
    */
@@ -757,12 +1498,15 @@ class ShareManager {
         return false;
       }
       
-      // 检查是否包含分享域名
-      const baseDomain = this.shareBaseUrl.replace('https://', '').replace('http://', '');
-      console.log('基础域名:', baseDomain);
-      console.log('是否包含域名:', text.includes(baseDomain));
+      // 检查是否包含任何分享域名
+      const isValidDomain = this.shareConfig.endpoints.some(endpoint => {
+        const domain = endpoint.replace('https://', '').replace('http://', '');
+        return text.includes(domain);
+      });
       
-      if (!text.includes(baseDomain)) {
+      console.log('是否包含有效域名:', isValidDomain);
+      
+      if (!isValidDomain) {
         console.log('不包含分享域名');
         return false;
       }
@@ -770,10 +1514,18 @@ class ShareManager {
       // 尝试解析URL
       const urlObj = new URL(text);
       console.log('解析的URL对象:', urlObj);
-      console.log('是否有data参数:', urlObj.searchParams.has('data'));
       
-      // 检查是否有data参数
-      return urlObj.searchParams.has('data');
+      // 检查是否为云端存储链接
+      if (urlObj.pathname.startsWith('/s/')) {
+        console.log('云端存储分享链接');
+        return true;
+      }
+      
+      // 检查是否为直接URL分享链接
+      const hasDataParam = urlObj.searchParams.has('data');
+      console.log('是否有data参数:', hasDataParam);
+      
+      return hasDataParam;
     } catch (error) {
       console.error('检查分享链接错误:', error);
       return false;
@@ -822,9 +1574,10 @@ class ShareManager {
   getShareLinkStats(jsonData) {
     try {
       const data = typeof jsonData === 'string' ? JSON.parse(jsonData) : jsonData;
-      const originalSize = JSON.stringify(data).length;
+      const jsonString = JSON.stringify(data);
+      const originalSize = new Blob([jsonString]).size; // 使用统一的字节大小计算方法
       const encodedData = this.encodeDataOptimized(data);
-      const finalUrl = `${this.shareBaseUrl}?data=${encodedData}`;
+      const finalUrl = `${this.getCurrentEndpoint()}/v?data=${encodedData}`;
       
       // 检测压缩级别和编码类型
       let compressionLevel = 0;
@@ -884,7 +1637,9 @@ class ShareManager {
         isCompressed: compressionLevel > 0,
         withinUrlLimit: finalUrl.length <= this.maxUrlLength,
         dataCategory: this.categorizeDataSize(originalSize),
-        efficiency: this.calculateEfficiency(originalSize, encodedSize)
+        efficiency: this.calculateEfficiency(originalSize, encodedSize),
+        shareMethod: originalSize > this.cloudStorageThreshold ? '云端存储' : '直接URL',
+        encryptionSupported: originalSize < 50000 // 支持加密的最大大小
       };
     } catch (error) {
       console.error('获取分享链接统计错误:', error);

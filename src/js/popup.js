@@ -391,7 +391,9 @@ function setupEventListeners() {
   );
   
   // 监听粘贴事件，自动识别分享链接（移除防抖以确保能正确获取剪贴板数据）
-  jsonInput.addEventListener('paste', handlePasteEvent);
+  jsonInput.addEventListener('paste', async (e) => {
+    await handlePasteEvent(e);
+  });
 
   // 模态框关闭按钮
   document.querySelectorAll('.close-btn').forEach(btn => {
@@ -435,7 +437,7 @@ function setupEventListeners() {
 }
 
 // 处理粘贴事件，识别分享链接
-function handlePasteEvent(e) {
+async function handlePasteEvent(e) {
   console.log('🎯 粘贴事件触发:', e);
   console.log('📅 事件时间:', new Date().toLocaleTimeString());
   console.log('🏷️  事件类型:', e.type, '| 是否可信任:', e.isTrusted);
@@ -502,7 +504,7 @@ function handlePasteEvent(e) {
 }
 
 // 处理剪贴板文本的辅助函数
-function processClipboardText(pastedText, originalEvent) {
+async function processClipboardText(pastedText, originalEvent) {
   console.log('🔄 开始处理剪贴板文本...');
   
   // 检查是否为分享链接
@@ -517,12 +519,16 @@ function processClipboardText(pastedText, originalEvent) {
     }
     
     // 显示加载状态
-    updateStatus('正在解析分享链接...', '');
+    updateStatus('正在解析分享链接...', 'info');
     
-    // 尝试解析分享链接
+    // 尝试解析分享链接（异步处理）
     try {
       console.log('🔧 尝试解析分享链接:', pastedText);
-      const jsonData = shareManager.getDataFromUrl(pastedText);
+      
+      // 显示进度信息
+      updateStatus('🔍 正在解析数据格式...', 'info');
+      
+      const jsonData = await shareManager.getDataFromUrl(pastedText); // 添加 await
       console.log('📊 解析结果:', jsonData);
       
       if (jsonData) {
@@ -558,18 +564,40 @@ function processClipboardText(pastedText, originalEvent) {
           }
         }
       } else {
-        updateStatus('⚠️ 无法解析分享链接，链接可能已损坏或过期', 'error');
+        updateStatus('❌ 无法解析分享链接，请检查链接格式是否正确', 'error');
       }
     } catch (error) {
       console.error('❌ 解析分享链接错误:', error);
+      console.error('错误堆栈:', error.stack);
+      
+      // 更友好的错误信息
       let errorMessage = '解析分享链接失败';
-      if (error.message.includes('Invalid URL')) {
-        errorMessage += ': 链接格式不正确';
-      } else if (error.message.includes('JSON')) {
-        errorMessage += ': JSON数据格式错误';
+      let suggestions = [];
+      
+      if (error.message.includes('URL格式不正确')) {
+        errorMessage = '链接格式不正确';
+        suggestions.push('请检查链接是否完整并包含所有必要参数');
+      } else if (error.message.includes('JSON数据格式错误')) {
+        errorMessage = 'JSON数据格式错误';
+        suggestions.push('链接可能已损坏，请重新生成分享链接');
+      } else if (error.message.includes('数据解码失败') || error.message.includes('所有解码策略都失败')) {
+        errorMessage = '数据解码失败';
+        suggestions.push('请尝试使用新版本的分享链接');
+        suggestions.push('或者联系发送方重新生成链接');
+      } else if (error.message.includes('timeout') || error.message.includes('超时')) {
+        errorMessage = '网络连接超时';
+        suggestions.push('请检查网络连接后重试');
       } else {
-        errorMessage += `: ${error.message}`;
+        // 保留原始错误信息，但更简洁
+        errorMessage = `解析失败: ${error.message.substring(0, 100)}`;
+        suggestions.push('请检查浏览器控制台获取详细错误信息');
       }
+      
+      // 如果有建议，添加到错误信息中
+      if (suggestions.length > 0) {
+        errorMessage += '\n建议: ' + suggestions.join('; ');
+      }
+      
       updateStatus(errorMessage, 'error');
     }
   } else {
@@ -1341,7 +1369,7 @@ function fallbackCopy(element) {
 }
 
 // 显示分享模态框
-function showShareModal() {
+async function showShareModal() {
   // 检查数据有效性
   const dataStatus = checkJsonDataStatus();
   if (!dataStatus.hasData || !dataStatus.isValid) {
@@ -1361,8 +1389,19 @@ function showShareModal() {
     
     const data = JSON.parse(jsonString);
     
-    // 使用增强的分享管理器生成链接
-    const shareResult = shareManager.generateShareLink(data);
+    // 显示加载状态
+    updateStatus('正在生成分享链接...', 'info');
+    
+    // 使用增强的分享管理器生成链接（支持加密和云存储）
+    const shareOptions = {
+      encrypt: false,  // 默认不加密（可以根据需求修改）
+      compress: true,  // 启用压缩
+      expiry: null,    // 无过期时间
+      password: null,  // 无密码保护
+      description: '分享的JSON数据'
+    };
+    
+    const shareResult = await shareManager.generateShareLink(data, shareOptions);
     
     if (!shareResult.success) {
       // 处理分享失败的情况
@@ -1376,6 +1415,19 @@ function showShareModal() {
     // 显示统计信息
     if (shareResult.stats) {
       displayShareStats(shareResult.stats);
+    }
+    
+    // 显示分享类型信息
+    if (shareResult.type) {
+      let typeMessage = '';
+      if (shareResult.type === 'CLOUD_STORAGE') {
+        typeMessage = `☁️ 使用云端存储模式 ${shareResult.encrypted ? '(已加密)' : ''}`;
+      } else {
+        typeMessage = `🔗 使用直接URL模式 ${shareResult.encrypted ? '(已加密)' : ''}`;
+      }
+      updateStatus(typeMessage, 'success');
+    } else {
+      updateStatus('✅ 分享链接生成成功', 'success');
     }
     
     // 隐藏下载建议区域
@@ -1409,23 +1461,34 @@ function handleShareFailure(shareResult, data, jsonString) {
   messageEl.innerHTML = `
     <div class="error-icon">⚠️</div>
     <div class="error-text">
-      <h4>数据量过大，无法生成分享链接</h4>
+      <h4>${shareResult.error === 'URL_TOO_LONG' ? '分享链接过长，系统将自动转为云端存储' : '数据量过大，无法生成分享链接'}</h4>
       <p>${shareResult.message}</p>
     </div>
   `;
   
-  // 显示详细统计
+  // 显示详细统计 - 使用统一的大小计算方法
   const sizeInfo = shareResult.originalSize ? 
-    `数据大小: ${(shareResult.originalSize / 1024).toFixed(1)}KB` : '';
-  const limitInfo = shareResult.maxSize ? 
-    `最大限制: ${(shareResult.maxSize / 1024).toFixed(1)}KB` : 
-    (shareResult.maxUrlLength ? `URL限制: ${shareResult.maxUrlLength}字符` : '');
+    `数据大小: ${dataManager.formatSize(shareResult.originalSize)}` : '';
+  
+  let limitInfo = '';
+  let recommendationText = '';
+  
+  if (shareResult.error === 'URL_TOO_LONG') {
+    limitInfo = `URL限制: ${shareResult.maxUrlLength}字符`;
+    recommendationText = '建议方案: 系统将自动转为云端存储';
+  } else if (shareResult.error === 'DATA_TOO_LARGE') {
+    limitInfo = `最大限制: ${dataManager.formatSize(shareResult.maxSize)}`;
+    recommendationText = '建议方案: 使用文件下载方式分享';
+  } else if (shareResult.maxSize) {
+    limitInfo = `最大限制: ${dataManager.formatSize(shareResult.maxSize)}`;
+    recommendationText = '建议方案: 使用文件下载方式分享';
+  }
   
   statsEl.innerHTML = `
     <div class="size-comparison">
       <div class="stat-row">${sizeInfo}</div>
       <div class="stat-row">${limitInfo}</div>
-      <div class="stat-row recommendation">建议方案: 使用文件下载方式分享</div>
+      <div class="stat-row recommendation">${recommendationText}</div>
     </div>
   `;
   
@@ -1441,7 +1504,10 @@ function handleShareFailure(shareResult, data, jsonString) {
   modal.style.display = 'block';
   
   // 更新状态提示
-  updateStatus('数据量过大，建议使用文件下载方式分享', 'warning');
+  const statusMessage = shareResult.error === 'URL_TOO_LONG' ? 
+    '分享链接过长，系统将自动转为云端存储模式' : 
+    '数据量过大，建议使用文件下载方式分享';
+  updateStatus(statusMessage, 'warning');
 }
 
 // 显示分享统计信息
@@ -1454,11 +1520,11 @@ function displayShareStats(stats) {
       </div>
       <div class="stat-item">
         <span class="stat-label">原始大小:</span>
-        <span class="stat-value">${stats.originalSize} 字符</span>
+        <span class="stat-value">${dataManager.formatSize(stats.originalSize)}</span>
       </div>
       <div class="stat-item">
         <span class="stat-label">编码后:</span>
-        <span class="stat-value">${stats.encodedSize} 字符</span>
+        <span class="stat-value">${dataManager.formatSize(stats.encodedSize)}</span>
       </div>
       <div class="stat-item">
         <span class="stat-label">编码方式:</span>
