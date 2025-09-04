@@ -1314,11 +1314,11 @@ class ShareManager {
                 result += String.fromCharCode(code);
                 console.log('🔤 单字符解码:', codeStr, '->', String.fromCharCode(code));
               } else {
-                console.warn('⚠️ 无效的字符码点:', codeStr, '解析结果:', code);
+                console.log('⚠️ 无效的字符码点:', codeStr, '解析结果:', code);
                 result += encoded.substring(i, j); // 保持原样
               }
             } catch (error) {
-              console.warn('⚠️ 字符解码失败:', codeStr, error);
+              console.log('⚠️ 字符解码失败:', codeStr, error);
               result += encoded.substring(i, j); // 保持原样
             }
           } else {
