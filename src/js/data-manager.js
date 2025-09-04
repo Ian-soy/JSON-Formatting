@@ -52,7 +52,7 @@ class DataManager {
    * @param {string} jsonData - JSON数据字符串
    * @returns {Object} 保存结果
    */
-  async saveJsonData(title, jsonData) {
+  async saveJsonData(title, jsonData, skipDuplicateCheck = false) {
     try {
       // 验证输入
       const validation = await this.validateInput(title, jsonData);
@@ -81,9 +81,26 @@ class DataManager {
         return { success: false, error: '标题已存在，请使用不同的标题' };
       }
 
+      // 检查内容是否重复（如果启用检查）
+      if (!skipDuplicateCheck) {
+        const contentHash = this.generateContentHash(jsonData);
+        const duplicateItem = savedData.find(item => item.contentHash === contentHash);
+        if (duplicateItem) {
+          return { 
+            success: false, 
+            error: `内容重复，已存在相同数据：${duplicateItem.title}`,
+            isDuplicate: true,
+            existingItem: duplicateItem
+          };
+        }
+      }
+
       // 压缩数据（如果启用）
       const processedData = settings.enableCompression ? 
         await this.compressData(jsonData) : { data: jsonData, compressed: false };
+
+      // 生成内容哈希
+      const contentHash = this.generateContentHash(jsonData);
 
       // 创建新的数据项
       const newItem = {
@@ -93,6 +110,7 @@ class DataManager {
         compressed: processedData.compressed,
         originalSize: jsonData.length,
         compressedSize: processedData.data.length,
+        contentHash: contentHash, // 添加内容哈希用于重复检测
         timestamp: Date.now(),
         createdAt: new Date().toISOString(),
         version: '2.0' // 数据版本标识
@@ -572,6 +590,40 @@ class DataManager {
     } catch (error) {
       console.error('检查存储空间失败:', error);
       return { hasSpace: true }; // 默认允许
+    }
+  }
+
+  /**
+   * 生成JSON内容的哈希值用于重复检测
+   * @param {string} jsonData - JSON数据字符串
+   * @returns {string} 哈希值
+   */
+  generateContentHash(jsonData) {
+    try {
+      // 规范化JSON数据（去除空格和格式化差异）
+      const normalized = JSON.stringify(JSON.parse(jsonData));
+      
+      // 使用简单的字符串哈希算法
+      let hash = 0;
+      for (let i = 0; i < normalized.length; i++) {
+        const char = normalized.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash = hash & hash; // 转换为32位整数
+      }
+      
+      // 转换为正数并返回十六进制字符串
+      return Math.abs(hash).toString(16);
+    } catch (error) {
+      console.warn('生成内容哈希失败，使用原始字符串哈希:', error);
+      
+      // 如果JSON解析失败，使用原始字符串生成哈希
+      let hash = 0;
+      for (let i = 0; i < jsonData.length; i++) {
+        const char = jsonData.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash = hash & hash;
+      }
+      return Math.abs(hash).toString(16);
     }
   }
 

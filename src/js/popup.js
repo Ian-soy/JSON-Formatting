@@ -1740,8 +1740,8 @@ async function autoSaveFormattedJson(formattedJson) {
     const timestamp = new Date().toLocaleString('zh-CN');
     const title = `自动保存_${timestamp}`;
     
-    // 保存数据
-    const result = await dataManager.saveJsonData(title, formattedJson);
+    // 保存数据（启用重复内容检测）
+    const result = await dataManager.saveJsonData(title, formattedJson, false);
     
     if (result.success) {
       lastAutoSaveTime = now;
@@ -1766,8 +1766,16 @@ async function autoSaveFormattedJson(formattedJson) {
       
       // 立即更新存储信息
       updateStorageStatusBar();
+    } else if (result.isDuplicate) {
+      // 处理重复内容情况
+      console.log(`自动保存跳过：检测到重复内容 - ${result.existingItem.title}`);
+      // 不显示错误信息，静默跳过重复内容的保存
+      return;
     } else if (result.storageInfo) {
       showStorageWarning(result);
+    } else {
+      // 其他错误情况
+      console.warn('自动保存失败:', result.error);
     }
   } catch (error) {
     console.error('自动保存失败:', error);
@@ -2162,7 +2170,7 @@ async function saveCurrentData() {
     // 显示保存中状态
     updateStatus('正在保存...', '');
     
-    const result = await dataManager.saveJsonData(title, jsonData);
+    const result = await dataManager.saveJsonData(title, jsonData, true); // 手动保存允许重复内容
     
     if (result.success) {
       updateStatus(`保存成功：${title}`, 'success');
