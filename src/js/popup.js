@@ -552,10 +552,13 @@ async function processClipboardText(pastedText, originalEvent) {
         }
         updateStatus(statusMessage, 'success');
         
-        // 记录到全局变量
+        // Record to global variable
         window.jsonData = jsonData;
         
-        // 自动隐藏历史面板（如果展开），方便查看导入的数据
+        // Auto-save imported share link data with duplicate detection
+        await autoSaveShareLinkData(jsonData, pastedText);
+        
+        // Automatically hide history panel (if expanded) for better viewing of imported data
         const historySection = document.getElementById('history-section');
         if (historySection && !historySection.classList.contains('collapsed')) {
           const toggleBtn = document.getElementById('history-toggle-btn');
@@ -1779,7 +1782,69 @@ function convertToCsv() {
   }
 }
 
-// 自动保存格式化后的JSON（增强版）
+// Auto-save share link data with duplicate detection
+async function autoSaveShareLinkData(jsonData, shareUrl) {
+  try {
+    // Check if auto-save is enabled
+    if (!autoSaveEnabled) return;
+    
+    // Create formatted JSON string
+    const formattedJson = JSON.stringify(jsonData, null, 2);
+    
+    // Check storage space
+    const spaceCheck = await dataManager.checkStorageSpace(formattedJson);
+    if (!spaceCheck.hasSpace) {
+      console.warn('Storage space insufficient for auto-saving share link data');
+      return;
+    }
+    
+    // Generate a descriptive title for share link import
+    const timestamp = new Date().toLocaleString('zh-CN');
+    const domain = new URL(shareUrl).hostname;
+    const title = `分享链接导入_${domain}_${timestamp}`;
+    
+    // Save data with duplicate detection enabled
+    const result = await dataManager.saveJsonData(title, formattedJson, false);
+    
+    if (result.success) {
+      console.log(`Share link data auto-saved: ${title}`);
+      
+      // Update status with save information
+      let statusMessage = `✓ 已成功导入并保存分享的JSON数据：${title}`;
+      
+      // Add compression info if applicable
+      if (result.compressionRatio > 0) {
+        statusMessage += ` (压缩率: ${result.compressionRatio}%)`;
+      }
+      
+      updateStatus(statusMessage, 'success');
+      
+      // Trigger history data refresh
+      const event = new CustomEvent('historyDataChanged');
+      document.dispatchEvent(event);
+      
+      // Update storage status bar
+      updateStorageStatusBar();
+    } else if (result.isDuplicate) {
+      // Handle duplicate content case
+      console.log(`Share link auto-save skipped: duplicate content detected - ${result.existingItem.title}`);
+      
+      // Show user-friendly message about existing data
+      const existingTitle = result.existingItem.title;
+      const existingDate = new Date(result.existingItem.timestamp).toLocaleString('zh-CN');
+      
+      updateStatus(`✓ 数据导入成功，检测到相同内容已存在：${existingTitle} (${existingDate})`, 'info');
+    } else {
+      // Other errors - log but don't show to user to avoid disrupting UX
+      console.warn('Share link auto-save failed:', result.error);
+    }
+  } catch (error) {
+    console.error('Share link auto-save failed:', error);
+    // Silent failure for auto-save to not disrupt user experience
+  }
+}
+
+// Auto-save formatted JSON (enhanced version)
 async function autoSaveFormattedJson(formattedJson) {
   try {
     // 检查是否启用自动保存

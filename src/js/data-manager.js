@@ -81,14 +81,15 @@ class DataManager {
         return { success: false, error: '标题已存在，请使用不同的标题' };
       }
 
-      // 检查内容是否重复（如果启用检查）
+      // Check for duplicate content (if check is enabled)
       if (!skipDuplicateCheck) {
         const contentHash = this.generateContentHash(jsonData);
         const duplicateItem = savedData.find(item => item.contentHash === contentHash);
         if (duplicateItem) {
+          const duplicateDate = new Date(duplicateItem.timestamp).toLocaleString('zh-CN');
           return { 
             success: false, 
-            error: `内容重复，已存在相同数据：${duplicateItem.title}`,
+            error: `Content duplicate detected. Same data already exists: ${duplicateItem.title} (saved on ${duplicateDate})`,
             isDuplicate: true,
             existingItem: duplicateItem
           };
@@ -594,29 +595,30 @@ class DataManager {
   }
 
   /**
-   * 生成JSON内容的哈希值用于重复检测
-   * @param {string} jsonData - JSON数据字符串
-   * @returns {string} 哈希值
+   * Generate content hash for JSON data for duplicate detection
+   * @param {string} jsonData - JSON data string
+   * @returns {string} Hash value
    */
   generateContentHash(jsonData) {
     try {
-      // 规范化JSON数据（去除空格和格式化差异）
-      const normalized = JSON.stringify(JSON.parse(jsonData));
+      // Normalize JSON data (remove whitespace and formatting differences)
+      const parsed = JSON.parse(jsonData);
+      const normalized = JSON.stringify(parsed, Object.keys(parsed).sort());
       
-      // 使用简单的字符串哈希算法
+      // Use simple string hash algorithm
       let hash = 0;
       for (let i = 0; i < normalized.length; i++) {
         const char = normalized.charCodeAt(i);
         hash = ((hash << 5) - hash) + char;
-        hash = hash & hash; // 转换为32位整数
+        hash = hash & hash; // Convert to 32-bit integer
       }
       
-      // 转换为正数并返回十六进制字符串
+      // Convert to positive number and return hex string
       return Math.abs(hash).toString(16);
     } catch (error) {
-      console.warn('生成内容哈希失败，使用原始字符串哈希:', error);
+      console.warn('Failed to generate content hash, using raw string hash:', error);
       
-      // 如果JSON解析失败，使用原始字符串生成哈希
+      // If JSON parsing fails, use raw string to generate hash
       let hash = 0;
       for (let i = 0; i < jsonData.length; i++) {
         const char = jsonData.charCodeAt(i);
