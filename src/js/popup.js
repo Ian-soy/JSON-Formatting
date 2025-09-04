@@ -67,6 +67,8 @@ async function initializeModules() {
     // 等待UI完全初始化后再加载数据
     setTimeout(async () => {
       await loadFirstSavedData();
+      // 启动存储监控
+      startStorageMonitoring();
     }, 200);
   } catch (error) {
     console.error('初始化模块错误:', error);
@@ -365,6 +367,18 @@ function setupEventListeners() {
   // 新增功能按钮
   document.getElementById('save-btn').addEventListener('click', showSaveModal);
   document.getElementById('settings-btn').addEventListener('click', () => settingsManager.toggleSettings());
+  
+  // 存储信息按钮
+  const storageInfoBtn = document.getElementById('storage-info-btn');
+  if (storageInfoBtn) {
+    storageInfoBtn.addEventListener('click', showStorageQuickInfo);
+  }
+  
+  // 测试转义解析按钮
+  const testEscapedBtn = document.getElementById('test-escaped-parsing-btn');
+  if (testEscapedBtn) {
+    testEscapedBtn.addEventListener('click', testEscapedParsing);
+  }
 
   // 输入框事件（使用防抖优化）
   const jsonInput = document.getElementById('json-input');
@@ -427,6 +441,26 @@ function setupEventListeners() {
         modal.style.display = 'none';
       }
     });
+  });
+  
+  // 全局键盘快捷键
+  document.addEventListener('keydown', (e) => {
+    // Ctrl+I 打开存储信息
+    if (e.ctrlKey && e.key === 'i') {
+      e.preventDefault();
+      showStorageQuickInfo();
+    }
+    // Ctrl+S 保存JSON数据
+    else if (e.ctrlKey && e.key === 's') {
+      e.preventDefault();
+      showSaveModal();
+    }
+    // F5 刷新存储信息
+    else if (e.key === 'F5' && e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
+      e.preventDefault();
+      updateStorageStatusBar();
+      updateStatus('存储信息已刷新', 'success');
+    }
   });
 }
 
@@ -617,9 +651,261 @@ function hideModalMessage(modalId) {
 
 // 更新字符计数（优化性能）
 function updateCharCount() {
-  const input = document.getElementById('json-input');
-  const count = input.value.length;
-  document.getElementById('char-count').textContent = `${count} 字符`;
+  updateStorageStatusBar();
+}
+
+// 实时存储监控
+let storageMonitorInterval = null;
+
+/**
+ * 启动存储监控
+ */
+function startStorageMonitoring() {
+  // 清除之前的定时器
+  if (storageMonitorInterval) {
+    clearInterval(storageMonitorInterval);
+  }
+  
+  // 立即更新一次
+  updateStorageStatusBar();
+  
+  // 每30秒更新一次存储信息
+  storageMonitorInterval = setInterval(() => {
+    updateStorageStatusBar();
+  }, 30000);
+}
+
+/**
+ * 停止存储监控
+ */
+function stopStorageMonitoring() {
+  if (storageMonitorInterval) {
+    clearInterval(storageMonitorInterval);
+    storageMonitorInterval = null;
+  }
+}
+
+/**
+ * 更新状态栏的存储信息
+ */
+async function updateStorageStatusBar() {
+  try {
+    const usage = await dataManager.getStorageUsage();
+    const charCountElement = document.getElementById('char-count');
+    
+    if (charCountElement) {
+      const input = document.getElementById('json-input');
+      const charCount = input ? input.value.length : 0;
+      const storageText = `${charCount} 字符 | 存储: ${usage.formatted.percentage}`;
+      
+      charCountElement.textContent = storageText;
+      
+      // 添加详细信息到tooltip
+      const remainingBytes = usage.quotaBytes - usage.usedBytes;
+      const tooltipText = `存储使用情况:
+已使用: ${usage.formatted.used}
+可用: ${dataManager.formatSize(remainingBytes)}
+总配额: ${usage.formatted.quota}
+使用率: ${usage.formatted.percentage}`;
+      charCountElement.title = tooltipText;
+      
+      // 根据使用率设置颜色
+      charCountElement.className = 'char-count';
+      if (usage.usageRatio > 0.9) {
+        charCountElement.classList.add('storage-critical');
+      } else if (usage.usageRatio > 0.8) {
+        charCountElement.classList.add('storage-warning');
+      } else {
+        charCountElement.classList.add('storage-safe');
+      }
+      
+      // 如果存储使用率超过90%，在状态栏显示警告
+      if (usage.usageRatio > 0.9 && !document.querySelector('.storage-critical-warning')) {
+        showStorageCriticalWarning();
+      }
+      
+      // 更新头部存储按钮
+      updateStorageButton(usage);
+    }
+  } catch (error) {
+    console.error('更新存储状态栏失败:', error);
+    // 回退到普通字符计数
+    const input = document.getElementById('json-input');
+    const charCountElement = document.getElementById('char-count');
+    if (input && charCountElement) {
+      charCountElement.textContent = `${input.value.length} 字符`;
+      charCountElement.title = '';
+    }
+  }
+}
+
+/**
+ * 显示存储严重警告
+ */
+function showStorageCriticalWarning() {
+  // 避免重复显示
+  if (document.querySelector('.storage-critical-warning')) return;
+  
+  const statusBar = document.querySelector('.status-bar');
+  if (!statusBar) return;
+  
+  const warningElement = document.createElement('div');
+  warningElement.className = 'storage-critical-warning';
+  warningElement.innerHTML = `
+    <span class="warning-icon">⚠️</span>
+    <span class="warning-text">存储空间不足</span>
+    <button class="warning-close">×</button>
+  `;
+  
+  statusBar.appendChild(warningElement);
+  
+  // Add event listener for close button
+  const closeBtn = warningElement.querySelector('.warning-close');
+  if (closeBtn) {
+    closeBtn.addEventListener('click', () => {
+      warningElement.remove();
+    });
+  }
+  
+  // 10秒后自动隐藏
+  setTimeout(() => {
+    if (warningElement.parentElement) {
+      warningElement.remove();
+    }
+  }, 10000);
+}
+
+/**
+ * 更新头部存储按钮
+ */
+function updateStorageButton(usage) {
+  const storageBtn = document.getElementById('storage-info-btn');
+  const indicator = storageBtn?.querySelector('.storage-usage-indicator');
+  
+  if (!storageBtn || !indicator) return;
+  
+  // 更新百分比显示
+  const percentage = Math.round(usage.usageRatio * 100);
+  indicator.textContent = `${percentage}%`;
+  
+  // 设置按钮样式
+  storageBtn.className = 'btn secondary storage-info-btn';
+  if (usage.usageRatio > 0.9) {
+    storageBtn.classList.add('storage-critical');
+  } else if (usage.usageRatio > 0.8) {
+    storageBtn.classList.add('storage-warning');
+  } else {
+    storageBtn.classList.add('storage-safe');
+  }
+  
+  // 更新tooltip为更详细的信息
+  const remainingBytes = usage.quotaBytes - usage.usedBytes;
+  const tooltipText = `存储使用情况:
+• 已使用: ${usage.formatted.used}
+• 可用空间: ${dataManager.formatSize(remainingBytes)}
+• 总配额: ${usage.formatted.quota}
+• 使用率: ${usage.formatted.percentage}
+
+点击查看详细信息`;
+  storageBtn.title = tooltipText;
+}
+
+/**
+ * 显示存储快速信息
+ */
+async function showStorageQuickInfo() {
+  try {
+    const storageInfo = await dataManager.getStorageInfo();
+    const usage = storageInfo.storage;
+    const compression = storageInfo.compression;
+    
+    const modal = document.createElement('div');
+    modal.className = 'modal storage-quick-info-modal';
+    modal.id = 'storage-quick-info-modal';
+    
+    const remainingBytes = usage.quotaBytes - usage.usedBytes;
+    
+    modal.innerHTML = `
+      <div class="modal-content storage-quick-content">
+        <span class="close-btn">&times;</span>
+        <h2>📊 存储状态</h2>
+        
+        <div class="quick-storage-visual">
+          <div class="quick-usage-bar">
+            <div class="quick-usage-fill" style="width: ${Math.min(usage.usageRatio * 100, 100)}%; background: ${
+              usage.usageRatio > 0.9 ? '#dc3545' : 
+              usage.usageRatio > 0.8 ? '#ffc107' : '#28a745'
+            }"></div>
+          </div>
+          <div class="quick-usage-text">${usage.formatted.percentage}</div>
+        </div>
+        
+        <div class="quick-stats-grid">
+          <div class="quick-stat">
+            <div class="stat-value">${usage.formatted.used}</div>
+            <div class="stat-label">已使用</div>
+          </div>
+          <div class="quick-stat">
+            <div class="stat-value">${dataManager.formatSize(remainingBytes)}</div>
+            <div class="stat-label">可用空间</div>
+          </div>
+          <div class="quick-stat">
+            <div class="stat-value">${storageInfo.totalItems}</div>
+            <div class="stat-label">已保存项</div>
+          </div>
+          <div class="quick-stat">
+            <div class="stat-value">${compression.compressionRatio}%</div>
+            <div class="stat-label">压缩率</div>
+          </div>
+        </div>
+        
+        <div class="quick-actions">
+          <button class="btn secondary" data-action="manage">🔧 管理</button>
+          <button class="btn primary" data-action="close">关闭</button>
+        </div>
+      </div>
+    `;
+    
+    document.body.appendChild(modal);
+    modal.style.display = 'block';
+    
+    // 添加关闭事件
+    modal.querySelector('.close-btn').addEventListener('click', closeStorageQuickInfo);
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        closeStorageQuickInfo();
+      }
+    });
+    
+    // 添加按钮事件
+    const manageBtn = modal.querySelector('[data-action="manage"]');
+    const closeBtn = modal.querySelector('[data-action="close"]');
+    
+    if (manageBtn) {
+      manageBtn.addEventListener('click', () => {
+        closeStorageQuickInfo();
+        showStorageManagement();
+      });
+    }
+    
+    if (closeBtn) {
+      closeBtn.addEventListener('click', closeStorageQuickInfo);
+    }
+    
+  } catch (error) {
+    console.error('显示存储快速信息失败:', error);
+    updateStatus('获取存储信息失败', 'error');
+  }
+}
+
+/**
+ * 关闭存储快速信息
+ */
+function closeStorageQuickInfo() {
+  const modal = document.getElementById('storage-quick-info-modal');
+  if (modal) {
+    modal.remove();
+  }
 }
 
 // 格式化JSON（使用Web Worker处理大型JSON）
@@ -761,8 +1047,8 @@ function showDetailedErrors(lineErrors) {
         ${errorsList}
       </div>
       <div class="modal-actions">
-        <button class="btn primary" onclick="closeErrorDetailsModal()">确定</button>
-        <button class="btn secondary" onclick="highlightErrorsInEditor()">在编辑器中高亮</button>
+        <button class="btn primary" data-action="confirm">确定</button>
+        <button class="btn secondary" data-action="highlight">在编辑器中高亮</button>
       </div>
     </div>
   `;
@@ -777,6 +1063,18 @@ function showDetailedErrors(lineErrors) {
       closeErrorDetailsModal();
     }
   });
+  
+  // 添加按钮事件
+  const confirmBtn = modal.querySelector('[data-action="confirm"]');
+  const highlightBtn = modal.querySelector('[data-action="highlight"]');
+  
+  if (confirmBtn) {
+    confirmBtn.addEventListener('click', closeErrorDetailsModal);
+  }
+  
+  if (highlightBtn) {
+    highlightBtn.addEventListener('click', highlightErrorsInEditor);
+  }
   
   // 更新状态栏显示错误数量
   const errorCount = lineErrors.filter(e => e.type === 'error').length;
@@ -1445,7 +1743,7 @@ function convertToCsv() {
   }
 }
 
-// 自动保存格式化后的JSON
+// 自动保存格式化后的JSON（增强版）
 async function autoSaveFormattedJson(formattedJson) {
   try {
     // 检查是否启用自动保存
@@ -1457,6 +1755,17 @@ async function autoSaveFormattedJson(formattedJson) {
       return;
     }
     
+    // 检查存储空间
+    const spaceCheck = await dataManager.checkStorageSpace(formattedJson);
+    if (!spaceCheck.hasSpace) {
+      showStorageWarning(spaceCheck);
+      return;
+    }
+    
+    if (spaceCheck.warning) {
+      showStorageWarning(spaceCheck);
+    }
+    
     // 生成自动保存标题
     const timestamp = new Date().toLocaleString('zh-CN');
     const title = `自动保存_${timestamp}`;
@@ -1466,15 +1775,315 @@ async function autoSaveFormattedJson(formattedJson) {
     
     if (result.success) {
       lastAutoSaveTime = now;
-      updateStatus(`已自动保存格式化后的JSON：${title}`, 'success');
+      
+      let statusMessage = `已自动保存格式化后的JSON：${title}`;
+      
+      // 显示压缩信息
+      if (result.compressionRatio > 0) {
+        statusMessage += ` (压缩率: ${result.compressionRatio}%)`;
+      }
+      
+      // 显示存储使用情况
+      if (result.storageInfo && result.storageInfo.usageRatio > 0.7) {
+        statusMessage += ` [存储: ${result.storageInfo.formatted.percentage}]`;
+      }
+      
+      updateStatus(statusMessage, 'success');
       
       // 触发历史数据刷新
       const event = new CustomEvent('historyDataChanged');
       document.dispatchEvent(event);
+      
+      // 立即更新存储信息
+      updateStorageStatusBar();
+    } else if (result.storageInfo) {
+      showStorageWarning(result);
     }
   } catch (error) {
     console.error('自动保存失败:', error);
     // 自动保存失败不显示错误提示，避免影响用户体验
+  }
+}
+
+/**
+ * 显示存储警告
+ */
+function showStorageWarning(spaceCheck) {
+  const modal = document.createElement('div');
+  modal.className = 'modal storage-warning-modal';
+  modal.id = 'storage-warning-modal';
+  
+  const isError = !spaceCheck.hasSpace;
+  const title = isError ? '存储空间不足' : '存储空间警告';
+  const icon = isError ? '🚨' : '⚠️';
+  const message = spaceCheck.error || spaceCheck.warning;
+  
+  let suggestionsHtml = '';
+  if (spaceCheck.suggestions && spaceCheck.suggestions.length > 0) {
+    suggestionsHtml = `
+      <div class="storage-suggestions">
+        <h4>💡 建议解决方案：</h4>
+        <ul>
+          ${spaceCheck.suggestions.map(suggestion => `<li>${suggestion}</li>`).join('')}
+        </ul>
+      </div>
+    `;
+  }
+  
+  let storageInfoHtml = '';
+  if (spaceCheck.info && spaceCheck.info.formatted) {
+    storageInfoHtml = `
+      <div class="storage-info">
+        <div class="storage-usage-bar">
+          <div class="usage-bar">
+            <div class="usage-fill" style="width: ${spaceCheck.info.formatted.percentage}"></div>
+          </div>
+          <div class="usage-text">
+            已使用: ${spaceCheck.info.formatted.used} / ${spaceCheck.info.formatted.quota} (${spaceCheck.info.formatted.percentage})
+          </div>
+        </div>
+      </div>
+    `;
+  }
+  
+  modal.innerHTML = `
+    <div class="modal-content storage-modal-content">
+      <span class="close-btn">&times;</span>
+      <h2>${icon} ${title}</h2>
+      <div class="storage-message">
+        <p>${message}</p>
+      </div>
+      ${storageInfoHtml}
+      ${suggestionsHtml}
+      <div class="modal-actions">
+        <button class="btn secondary" data-action="settings">🔧 打开设置</button>
+        <button class="btn primary" data-action="close">确定</button>
+      </div>
+    </div>
+  `;
+  
+  document.body.appendChild(modal);
+  modal.style.display = 'block';
+  
+  // 添加关闭事件
+  modal.querySelector('.close-btn').addEventListener('click', closeStorageWarning);
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) {
+      closeStorageWarning();
+    }
+  });
+  
+  // 添加按钮事件
+  const settingsBtn = modal.querySelector('[data-action="settings"]');
+  const closeBtn = modal.querySelector('[data-action="close"]');
+  
+  if (settingsBtn) {
+    settingsBtn.addEventListener('click', openStorageSettings);
+  }
+  
+  if (closeBtn) {
+    closeBtn.addEventListener('click', closeStorageWarning);
+  }
+}
+
+/**
+ * 关闭存储警告
+ */
+function closeStorageWarning() {
+  const modal = document.getElementById('storage-warning-modal');
+  if (modal) {
+    modal.remove();
+  }
+}
+
+/**
+ * 打开存储设置
+ */
+function openStorageSettings() {
+  closeStorageWarning();
+  // 这里可以打开设置面板或者显示存储管理面板
+  showStorageManagement();
+}
+
+/**
+ * 显示存储管理面板
+ */
+async function showStorageManagement() {
+  try {
+    const storageInfo = await dataManager.getStorageInfo();
+    
+    const modal = document.createElement('div');
+    modal.className = 'modal storage-management-modal';
+    modal.id = 'storage-management-modal';
+    
+    const compressionInfo = storageInfo.compression;
+    const storageUsage = storageInfo.storage;
+    
+    modal.innerHTML = `
+      <div class="modal-content storage-management-content">
+        <span class="close-btn">&times;</span>
+        <h2>📊 存储管理</h2>
+        
+        <div class="storage-stats">
+          <div class="stat-group">
+            <h3>📁 数据统计</h3>
+            <div class="stat-item">
+              <span>已保存数据:</span>
+              <span>${storageInfo.totalItems} / ${storageInfo.maxItems} 条</span>
+            </div>
+            <div class="stat-item">
+              <span>存储使用:</span>
+              <span>${storageUsage.formatted.used} / ${storageUsage.formatted.quota} (${storageUsage.formatted.percentage})</span>
+            </div>
+          </div>
+          
+          <div class="stat-group">
+            <h3>🗃️ 压缩统计</h3>
+            <div class="stat-item">
+              <span>压缩状态:</span>
+              <span>${compressionInfo.enabled ? '✅ 已启用' : '❌ 未启用'}</span>
+            </div>
+            <div class="stat-item">
+              <span>压缩项目:</span>
+              <span>${compressionInfo.compressedItems} / ${compressionInfo.totalItems} 条</span>
+            </div>
+            <div class="stat-item">
+              <span>压缩效果:</span>
+              <span>${compressionInfo.compressionRatio}% (节省 ${dataManager.formatSize(compressionInfo.savedBytes)})</span>
+            </div>
+          </div>
+        </div>
+        
+        <div class="storage-actions">
+          <h3>🔧 管理操作</h3>
+          <div class="action-buttons">
+            <button class="btn secondary" data-action="clean-expired">🧹 清理过期数据</button>
+            <button class="btn secondary" data-action="enable-compression">🗃️ 启用压缩</button>
+            <button class="btn danger" data-action="clear-all">🗑️ 清空所有数据</button>
+          </div>
+        </div>
+        
+        <div class="modal-actions">
+          <button class="btn primary" data-action="close">关闭</button>
+        </div>
+      </div>
+    `;
+    
+    document.body.appendChild(modal);
+    modal.style.display = 'block';
+    
+    // 添加关闭事件
+    modal.querySelector('.close-btn').addEventListener('click', closeStorageManagement);
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        closeStorageManagement();
+      }
+    });
+    
+    // 添加按钮事件
+    const cleanBtn = modal.querySelector('[data-action="clean-expired"]');
+    const compressBtn = modal.querySelector('[data-action="enable-compression"]');
+    const clearBtn = modal.querySelector('[data-action="clear-all"]');
+    const closeBtn = modal.querySelector('[data-action="close"]');
+    
+    if (cleanBtn) {
+      cleanBtn.addEventListener('click', cleanExpiredData);
+    }
+    
+    if (compressBtn) {
+      compressBtn.addEventListener('click', enableCompression);
+    }
+    
+    if (clearBtn) {
+      clearBtn.addEventListener('click', clearAllStorageData);
+    }
+    
+    if (closeBtn) {
+      closeBtn.addEventListener('click', closeStorageManagement);
+    }
+    
+  } catch (error) {
+    console.error('显示存储管理面板失败:', error);
+    updateStatus('获取存储信息失败', 'error');
+  }
+}
+
+/**
+ * 关闭存储管理面板
+ */
+function closeStorageManagement() {
+  const modal = document.getElementById('storage-management-modal');
+  if (modal) {
+    modal.remove();
+  }
+}
+
+/**
+ * 清理过期数据
+ */
+async function cleanExpiredData() {
+  try {
+    const count = await dataManager.cleanExpiredData();
+    updateStatus(`已清理 ${count} 条过期数据`, 'success');
+    
+    // 刷新历史数据
+    const event = new CustomEvent('historyDataChanged');
+    document.dispatchEvent(event);
+    
+    // 刷新存储管理面板
+    closeStorageManagement();
+    setTimeout(() => showStorageManagement(), 100);
+  } catch (error) {
+    console.error('清理过期数据失败:', error);
+    updateStatus('清理过期数据失败', 'error');
+  }
+}
+
+/**
+ * 启用压缩
+ */
+async function enableCompression() {
+  try {
+    const result = await dataManager.saveSettings({ enableCompression: true });
+    if (result.success) {
+      updateStatus('已启用数据压缩功能', 'success');
+      
+      // 刷新存储管理面板
+      closeStorageManagement();
+      setTimeout(() => showStorageManagement(), 100);
+    } else {
+      updateStatus('启用压缩失败: ' + result.error, 'error');
+    }
+  } catch (error) {
+    console.error('启用压缩失败:', error);
+    updateStatus('启用压缩失败', 'error');
+  }
+}
+
+/**
+ * 清空所有存储数据
+ */
+async function clearAllStorageData() {
+  const confirmed = confirm('确定要清空所有存储数据吗？此操作不可恢复！');
+  if (!confirmed) return;
+  
+  try {
+    const result = await dataManager.clearAllData();
+    if (result.success) {
+      updateStatus('已清空所有数据', 'success');
+      
+      // 刷新历史数据
+      const event = new CustomEvent('historyDataChanged');
+      document.dispatchEvent(event);
+      
+      // 关闭面板
+      closeStorageManagement();
+    } else {
+      updateStatus('清空数据失败: ' + result.error, 'error');
+    }
+  } catch (error) {
+    console.error('清空数据失败:', error);
+    updateStatus('清空数据失败', 'error');
   }
 }
 

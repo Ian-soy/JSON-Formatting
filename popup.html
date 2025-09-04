@@ -11,6 +11,9 @@
     <div class="header">
       <h1>JSON格式化大师</h1>
       <div class="header-actions">
+        <button id="storage-info-btn" class="btn secondary storage-info-btn" title="存储情况 (快捷键: Ctrl+I)">
+          <span class="storage-usage-indicator">--</span>
+        </button>
         <button id="settings-btn" class="btn secondary"><span class="icon-container"></span></button>
       </div>
     </div>
@@ -52,7 +55,7 @@
                   <li>右侧历史面板可加载保存的数据</li>
                 </ul>
                 <div style="margin-top: 15px;">
-                  <button onclick="testEscapedParsing()" style="padding: 8px 12px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                  <button id="test-escaped-parsing-btn" style="padding: 8px 12px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
                     🧪 测试JSON字符串解析
                   </button>
                 </div>

@@ -12,11 +12,16 @@ class HistoryManager {
    */
   async initialize() {
     this.historyListElement = document.getElementById('history-list');
-    this.setupEventListeners();
-    this.initializeToggleButton(); // 初始化展开/折叠按钮
     
-    // 默认折叠历史面板
-    this.collapseHistoryPanel();
+    // 等待DOM元素完全加载后再设置事件监听器
+    setTimeout(() => {
+      this.setupEventListeners();
+      this.initializeToggleButton(); // 初始化展开/折叠按钮
+      
+      // 默认折叠历史面板（同时更新状态）
+      this.collapseHistoryPanel();
+      this.isCollapsed = true; // 确保状态同步
+    }, 100);
     
     await this.refreshHistoryList();
   }
@@ -29,12 +34,21 @@ class HistoryManager {
     const refreshBtn = document.getElementById('refresh-history-btn');
     if (refreshBtn) {
       refreshBtn.addEventListener('click', () => this.refreshHistoryList());
+      console.log('✅ 刷新按钮事件已绑定');
     }
 
     // 展开/折叠按钮事件
     const toggleBtn = document.getElementById('history-toggle-btn');
     if (toggleBtn) {
-      toggleBtn.addEventListener('click', () => this.toggleHistoryPanel());
+      toggleBtn.addEventListener('click', (e) => {
+        console.log('🔄 展开/折叠按钮被点击');
+        e.preventDefault();
+        e.stopPropagation();
+        this.toggleHistoryPanel();
+      });
+      console.log('✅ 展开/折叠按钮事件已绑定');
+    } else {
+      console.error('❌ 展开/折叠按钮未找到');
     }
 
     // 监听历史数据变化事件
@@ -332,8 +346,14 @@ class HistoryManager {
     const historySection = document.getElementById('history-section');
     const toggleBtn = document.getElementById('history-toggle-btn');
     
-    if (!historySection || !toggleBtn) return;
+    if (!historySection || !toggleBtn) {
+      console.error('历史面板元素未找到');
+      return;
+    }
 
+    console.log('切换前状态:', { isCollapsed: this.isCollapsed, domCollapsed: historySection.classList.contains('collapsed') });
+    
+    // 切换状态
     this.isCollapsed = !this.isCollapsed;
     
     if (this.isCollapsed) {
@@ -341,14 +361,24 @@ class HistoryManager {
       historySection.classList.add('collapsed');
       toggleBtn.title = '展开历史面板';
       // 更新图标为向右箭头
-      toggleBtn.querySelector('.icon-container').innerHTML = IconManager.getIcon('chevron-right');
+      const iconContainer = toggleBtn.querySelector('.icon-container');
+      if (iconContainer) {
+        iconContainer.innerHTML = IconManager.getIcon('chevron-right');
+      }
+      console.log('✅ 已折叠历史面板');
     } else {
       // 展开状态
       historySection.classList.remove('collapsed');
       toggleBtn.title = '折叠历史面板';
       // 更新图标为向左箭头
-      toggleBtn.querySelector('.icon-container').innerHTML = IconManager.getIcon('chevron-left');
+      const iconContainer = toggleBtn.querySelector('.icon-container');
+      if (iconContainer) {
+        iconContainer.innerHTML = IconManager.getIcon('chevron-left');
+      }
+      console.log('✅ 已展开历史面板');
     }
+    
+    console.log('切换后状态:', { isCollapsed: this.isCollapsed, domCollapsed: historySection.classList.contains('collapsed') });
   }
 
   /**
@@ -358,7 +388,13 @@ class HistoryManager {
     const toggleBtn = document.getElementById('history-toggle-btn');
     if (toggleBtn) {
       // 默认状态为展开，显示向左箭头（折叠）
-      toggleBtn.querySelector('.icon-container').innerHTML = IconManager.getIcon('chevron-left');
+      const iconContainer = toggleBtn.querySelector('.icon-container');
+      if (iconContainer) {
+        iconContainer.innerHTML = IconManager.getIcon('chevron-left');
+      }
+      console.log('✅ 展开/折叠按钮图标已初始化');
+    } else {
+      console.error('❌ initializeToggleButton: 按钮元素未找到');
     }
   }
 
@@ -371,7 +407,14 @@ class HistoryManager {
 
     if (historySection && toggleBtn) {
       historySection.classList.add('collapsed');
-      toggleBtn.querySelector('.icon-container').innerHTML = IconManager.getIcon('chevron-right');
+      toggleBtn.title = '展开历史面板';
+      
+      const iconContainer = toggleBtn.querySelector('.icon-container');
+      if (iconContainer) {
+        iconContainer.innerHTML = IconManager.getIcon('chevron-right');
+      }
+      
+      console.log('📁 历史面板已默认折叠');
     }
   }
 }

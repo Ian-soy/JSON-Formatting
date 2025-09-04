@@ -3,6 +3,7 @@ class SettingsManager {
   constructor() {
     this.isOpen = false;
     this.dataManager = null;
+    this.storageUpdateInterval = null;
   }
 
   /**
@@ -91,6 +92,12 @@ class SettingsManager {
 
       // 更新按钮状态
       this.updateSettingsButtonState();
+      
+      // 立即刷新存储信息
+      await this.refreshStorageInfo();
+      
+      // 启动存储信息实时更新
+      this.startStorageInfoUpdate();
     } catch (error) {
       console.error('打开设置失败:', error);
       this.showMessage('设置加载失败', 'error');
@@ -109,6 +116,9 @@ class SettingsManager {
 
     // 更新按钮状态
     this.updateSettingsButtonState();
+    
+    // 停止存储信息实时更新
+    this.stopStorageInfoUpdate();
   }
 
   /**
@@ -311,12 +321,15 @@ class SettingsManager {
   }
 
   /**
-   * 更新存储信息显示
+   * 更新存储信息显示（增强版）
    * @param {Object} storageInfo - 存储信息
    */
-  updateStorageInfo(storageInfo) {
-    if (!storageInfo) return;
+  async updateStorageInfo(storageInfo) {
+    if (!storageInfo) {
+      storageInfo = await this.dataManager.getStorageInfo();
+    }
 
+    // 更新基本信息
     const currentItemsElement = document.getElementById('current-items-count');
     if (currentItemsElement) {
       currentItemsElement.textContent = `${storageInfo.totalItems}/${storageInfo.maxItems}`;
@@ -333,6 +346,236 @@ class SettingsManager {
       oldestItemElement.textContent = date.toLocaleDateString('zh-CN');
     } else if (oldestItemElement) {
       oldestItemElement.textContent = '无数据';
+    }
+    
+    // 更新存储使用情况显示
+    await this.updateStorageUsageDisplay(storageInfo.storage);
+    
+    // 更新压缩信息显示
+    this.updateCompressionDisplay(storageInfo.compression);
+  }
+  
+  /**
+   * 更新存储使用情况显示
+   */
+  async updateStorageUsageDisplay(storageUsage) {
+    if (!storageUsage) {
+      storageUsage = await this.dataManager.getStorageUsage();
+    }
+    
+    // 更新或创建存储使用情况元素
+    let storageContainer = document.getElementById('storage-usage-container');
+    if (!storageContainer) {
+      storageContainer = this.createStorageUsageContainer();
+      const settingsContent = document.querySelector('.settings-content');
+      if (settingsContent) {
+        // 在存储信息后面插入
+        const storageInfoSection = settingsContent.querySelector('.storage-info-section');
+        if (storageInfoSection) {
+          storageInfoSection.insertAdjacentElement('afterend', storageContainer);
+        } else {
+          settingsContent.appendChild(storageContainer);
+        }
+      }
+    }
+    
+    // 更新数值
+    const usageBar = storageContainer.querySelector('.storage-usage-bar .usage-fill');
+    const usageText = storageContainer.querySelector('.storage-usage-text');
+    const usagePercentage = storageContainer.querySelector('.storage-usage-percentage');
+    const quotaInfo = storageContainer.querySelector('.storage-quota-info');
+    
+    if (usageBar) {
+      const percentage = Math.min(storageUsage.usageRatio * 100, 100);
+      usageBar.style.width = `${percentage}%`;
+      
+      // 根据使用率设置颜色
+      if (storageUsage.usageRatio > 0.9) {
+        usageBar.style.background = '#dc3545'; // 红色 - 危险
+      } else if (storageUsage.usageRatio > 0.8) {
+        usageBar.style.background = '#ffc107'; // 黄色 - 警告
+      } else {
+        usageBar.style.background = '#28a745'; // 绿色 - 安全
+      }
+    }
+    
+    if (usageText) {
+      usageText.textContent = `${storageUsage.formatted.used} / ${storageUsage.formatted.quota}`;
+    }
+    
+    if (usagePercentage) {
+      usagePercentage.textContent = storageUsage.formatted.percentage;
+      // 根据使用率设置样式
+      usagePercentage.className = 'storage-usage-percentage';
+      if (storageUsage.usageRatio > 0.9) {
+        usagePercentage.classList.add('critical');
+      } else if (storageUsage.usageRatio > 0.8) {
+        usagePercentage.classList.add('warning');
+      } else {
+        usagePercentage.classList.add('safe');
+      }
+    }
+    
+    if (quotaInfo) {
+      const remainingBytes = storageUsage.quotaBytes - storageUsage.usedBytes;
+      quotaInfo.innerHTML = `
+        <div class="quota-item">
+          <span class="quota-label">已使用:</span>
+          <span class="quota-value">${storageUsage.formatted.used}</span>
+        </div>
+        <div class="quota-item">
+          <span class="quota-label">可用:</span>
+          <span class="quota-value">${this.dataManager.formatSize(remainingBytes)}</span>
+        </div>
+        <div class="quota-item">
+          <span class="quota-label">总配额:</span>
+          <span class="quota-value">${storageUsage.formatted.quota}</span>
+        </div>
+      `;
+    }
+  }
+  
+  /**
+   * 创建存储使用情况容器
+   */
+  createStorageUsageContainer() {
+    const container = document.createElement('div');
+    container.id = 'storage-usage-container';
+    container.className = 'storage-usage-section';
+    
+    container.innerHTML = `
+      <h3 class="section-title">
+        <span class="section-icon">📊</span>
+        存储使用情况
+        <button class="refresh-storage-btn" title="刷新存储信息">
+          🔄
+        </button>
+      </h3>
+      <div class="storage-usage-content">
+        <div class="storage-usage-visual">
+          <div class="storage-usage-bar">
+            <div class="usage-fill"></div>
+          </div>
+          <div class="storage-usage-info">
+            <span class="storage-usage-text">0 B / 10 MB</span>
+            <span class="storage-usage-percentage safe">0%</span>
+          </div>
+        </div>
+        <div class="storage-quota-info">
+          <div class="quota-item">
+            <span class="quota-label">已使用:</span>
+            <span class="quota-value">0 B</span>
+          </div>
+          <div class="quota-item">
+            <span class="quota-label">可用:</span>
+            <span class="quota-value">10 MB</span>
+          </div>
+          <div class="quota-item">
+            <span class="quota-label">总配额:</span>
+            <span class="quota-value">10 MB</span>
+          </div>
+        </div>
+      </div>
+    `;
+    
+    // Add event listener for refresh button after DOM insertion
+    setTimeout(() => {
+      const refreshBtn = container.querySelector('.refresh-storage-btn');
+      if (refreshBtn) {
+        refreshBtn.addEventListener('click', () => this.refreshStorageInfo());
+      }
+    }, 0);
+    
+    return container;
+  }
+  
+  /**
+   * 更新压缩信息显示
+   */
+  updateCompressionDisplay(compressionInfo) {
+    if (!compressionInfo) return;
+    
+    let compressionContainer = document.getElementById('compression-info-container');
+    if (!compressionContainer) {
+      compressionContainer = this.createCompressionInfoContainer();
+      const storageContainer = document.getElementById('storage-usage-container');
+      if (storageContainer) {
+        storageContainer.insertAdjacentElement('afterend', compressionContainer);
+      }
+    }
+    
+    const enabledStatus = compressionContainer.querySelector('.compression-enabled');
+    const compressionRatio = compressionContainer.querySelector('.compression-ratio');
+    const compressedItems = compressionContainer.querySelector('.compressed-items');
+    const savedBytes = compressionContainer.querySelector('.saved-bytes');
+    
+    if (enabledStatus) {
+      enabledStatus.textContent = compressionInfo.enabled ? '✅ 已启用' : '❌ 未启用';
+      enabledStatus.className = compressionInfo.enabled ? 'compression-enabled enabled' : 'compression-enabled disabled';
+    }
+    
+    if (compressionRatio) {
+      compressionRatio.textContent = `${compressionInfo.compressionRatio}%`;
+    }
+    
+    if (compressedItems) {
+      compressedItems.textContent = `${compressionInfo.compressedItems}/${compressionInfo.totalItems}`;
+    }
+    
+    if (savedBytes) {
+      savedBytes.textContent = this.dataManager.formatSize(compressionInfo.savedBytes);
+    }
+  }
+  
+  /**
+   * 创建压缩信息容器
+   */
+  createCompressionInfoContainer() {
+    const container = document.createElement('div');
+    container.id = 'compression-info-container';
+    container.className = 'compression-info-section';
+    
+    container.innerHTML = `
+      <h3 class="section-title">
+        <span class="section-icon">🗃️</span>
+        数据压缩信息
+      </h3>
+      <div class="compression-info-content">
+        <div class="compression-stat-grid">
+          <div class="compression-stat">
+            <span class="stat-label">压缩状态:</span>
+            <span class="compression-enabled">❌ 未启用</span>
+          </div>
+          <div class="compression-stat">
+            <span class="stat-label">压缩率:</span>
+            <span class="compression-ratio">0%</span>
+          </div>
+          <div class="compression-stat">
+            <span class="stat-label">压缩项目:</span>
+            <span class="compressed-items">0/0</span>
+          </div>
+          <div class="compression-stat">
+            <span class="stat-label">节省空间:</span>
+            <span class="saved-bytes">0 B</span>
+          </div>
+        </div>
+      </div>
+    `;
+    
+    return container;
+  }
+  
+  /**
+   * 刷新存储信息
+   */
+  async refreshStorageInfo() {
+    try {
+      const storageInfo = await this.dataManager.getStorageInfo();
+      await this.updateStorageInfo(storageInfo);
+      this.showMessage('存储信息已刷新', 'success');
+    } catch (error) {
+      console.error('刷新存储信息失败:', error);
+      this.showMessage('刷新失败', 'error');
     }
   }
 
@@ -381,6 +624,32 @@ class SettingsManager {
     return {
       isOpen: this.isOpen
     };
+  }
+  
+  /**
+   * 启动存储信息实时更新
+   */
+  startStorageInfoUpdate() {
+    // 清除之前的定时器
+    this.stopStorageInfoUpdate();
+    
+    // 立即更新一次
+    this.refreshStorageInfo();
+    
+    // 每10秒更新一次（设置面板中更频繁）
+    this.storageUpdateInterval = setInterval(() => {
+      this.refreshStorageInfo();
+    }, 10000);
+  }
+  
+  /**
+   * 停止存储信息实时更新
+   */
+  stopStorageInfoUpdate() {
+    if (this.storageUpdateInterval) {
+      clearInterval(this.storageUpdateInterval);
+      this.storageUpdateInterval = null;
+    }
   }
 }
 
