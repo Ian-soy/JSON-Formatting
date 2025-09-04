@@ -165,47 +165,63 @@ async function loadFirstSavedData() {
 }
 
 /**
- * 检查是否有有效的JSON数据
+ * Check if there is valid JSON data
  * @returns {Object} { hasData: boolean, isEmpty: boolean, isValid: boolean, message: string }
  */
 function checkJsonDataStatus() {
   const input = document.getElementById('json-input');
   const value = input.value.trim();
   
-  // 检查是否为空
+  // Check if empty
   if (!value) {
     return {
       hasData: false,
       isEmpty: true,
       isValid: false,
-      message: '请先输入或粘贴JSON数据'
+      message: 'Please enter or paste JSON data first'
     };
   }
   
-  // 首先尝试直接解析
+  // First try direct parsing
   try {
     JSON.parse(value);
     return {
       hasData: true,
       isEmpty: false,
       isValid: true,
-      message: '数据就绪'
+      message: 'Data ready'
     };
   } catch (parseError) {
-    // 如果直接解析失败，检查是否看起来像JSON
+    // If direct parsing fails, try parsing escaped strings
+    try {
+      const escapeResult = JsonUtils.parseEscapedJson(value);
+      if (escapeResult.success) {
+        // Successfully parsed escaped string
+        return {
+          hasData: true,
+          isEmpty: false,
+          isValid: true,
+          message: 'Data ready (escaped string detected)'
+        };
+      }
+    } catch (escapeError) {
+      // Escaped parsing also failed, continue to check if looks like JSON
+    }
+    
+    // If both parsing attempts failed, check if it looks like JSON
     if (JsonUtils.looksLikeJson(value)) {
       return {
         hasData: true,
         isEmpty: false,
         isValid: false,
-        message: 'JSON格式无效，可使用格式化功能查看详细错误信息'
+        message: 'Invalid JSON format, use format function to view detailed error information'
       };
     } else {
       return {
         hasData: true,
         isEmpty: false,
         isValid: false,
-        message: '输入内容不是有效的JSON格式'
+        message: 'Input content is not valid JSON format'
       };
     }
   }
@@ -1332,9 +1348,9 @@ function minifyJSON() {
 }
 
 
-// 复制JSON（使用现代API）
+// Copy JSON (using modern API with smart parsing)
 function copyJSON() {
-  // 检查数据有效性
+  // Check data validity
   const dataStatus = checkJsonDataStatus();
   if (!dataStatus.hasData) {
     updateStatus(dataStatus.message, 'warning');
@@ -1342,32 +1358,69 @@ function copyJSON() {
   }
   
   const input = document.getElementById('json-input');
+  let contentToCopy = input.value;
   
-  // 使用现代Clipboard API（如果可用）
+  // If data is valid, try to get properly formatted JSON
+  if (dataStatus.isValid) {
+    try {
+      // Use smart format to handle both regular and escaped JSON
+      const formatResult = JsonUtils.smartFormat(input.value.trim());
+      if (formatResult.success) {
+        contentToCopy = formatResult.result;
+      }
+    } catch (error) {
+      console.warn('Failed to format JSON for copying, using original content:', error);
+      // Fall back to original content if formatting fails
+    }
+  }
+  
+  // Use modern Clipboard API (if available)
   if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(input.value)
+    navigator.clipboard.writeText(contentToCopy)
       .then(() => {
-        updateStatus('JSON已复制到剪贴板', 'success');
+        updateStatus('JSON copied to clipboard', 'success');
       })
       .catch(error => {
-        console.error('复制失败:', error);
-        // 回退到传统方法
-        fallbackCopy(input);
+        console.error('Copy failed:', error);
+        // Fall back to traditional method
+        fallbackCopyText(contentToCopy);
       });
   } else {
-    // 回退到传统方法
-    fallbackCopy(input);
+    // Fall back to traditional method
+    fallbackCopyText(contentToCopy);
   }
 }
 
-// 传统复制方法
+// Traditional copy method for elements
 function fallbackCopy(element) {
   element.select();
   const success = document.execCommand('copy');
   if (success) {
-    updateStatus('JSON已复制到剪贴板', 'success');
+    updateStatus('JSON copied to clipboard', 'success');
   } else {
-    updateStatus('复制失败，请手动复制', 'error');
+    updateStatus('Copy failed, please copy manually', 'error');
+  }
+}
+
+// Traditional copy method for text content
+function fallbackCopyText(text) {
+  const tempInput = document.createElement('textarea');
+  tempInput.value = text;
+  tempInput.style.position = 'fixed';
+  tempInput.style.left = '-9999px';
+  tempInput.style.top = '-9999px';
+  document.body.appendChild(tempInput);
+  
+  tempInput.select();
+  tempInput.setSelectionRange(0, 99999); // For mobile devices
+  
+  const success = document.execCommand('copy');
+  document.body.removeChild(tempInput);
+  
+  if (success) {
+    updateStatus('JSON copied to clipboard', 'success');
+  } else {
+    updateStatus('Copy failed, please copy manually', 'error');
   }
 }
 
