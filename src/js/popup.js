@@ -119,7 +119,7 @@ function updateToolbarButtonsState() {
         // 禁用按钮
         button.disabled = true;
         button.classList.add('disabled');
-        button.title = `${buttonConfig.title} - ${status.message}`;
+        button.title = `${buttonConfig.title}`;
       }
     }
   });
