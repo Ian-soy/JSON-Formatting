@@ -372,6 +372,8 @@ function setupEventListeners() {
   const storageInfoBtn = document.getElementById('storage-info-btn');
   if (storageInfoBtn) {
     storageInfoBtn.addEventListener('click', showStorageQuickInfo);
+    // 设置初始标题
+    storageInfoBtn.title = '💾 存储情况\n点击查看详细的存储使用情况和管理选项';
   }
   
   // 测试转义解析按钮
@@ -800,14 +802,14 @@ function updateStorageButton(usage) {
   
   // 更新tooltip为更详细的信息
   const remainingBytes = usage.quotaBytes - usage.usedBytes;
-  const tooltipText = `存储使用情况:
+  const tooltipText = `💾 存储使用情况:
 • 已使用: ${usage.formatted.used}
 • 可用空间: ${dataManager.formatSize(remainingBytes)}
 • 总配额: ${usage.formatted.quota}
 • 使用率: ${usage.formatted.percentage}
 
-点击查看详细信息`;
-  storageBtn.title = '';
+💡 点击查看详细信息和管理选项`;
+  storageBtn.title = tooltipText;
 }
 
 /**
