@@ -1,0 +1,229 @@
+{
+  "users": [
+    {
+      "id": 1,
+      "name": "张三",
+      "email": "zhangsan@example.com",
+      "age": 28,
+      "department": "技术部",
+      "position": "前端工程师",
+      "avatar": "https://api.dicebear.com/7.x/avataaars/svg?seed=zhangsan",
+      "createdAt": "2024-01-15T08:30:00Z",
+      "isActive": true
+    },
+    {
+      "id": 2,
+      "name": "李四",
+      "email": "lisi@example.com",
+      "age": 32,
+      "department": "技术部",
+      "position": "后端工程师",
+      "avatar": "https://api.dicebear.com/7.x/avataaars/svg?seed=lisi",
+      "createdAt": "2024-01-10T09:15:00Z",
+      "isActive": true
+    },
+    {
+      "id": 3,
+      "name": "王五",
+      "email": "wangwu@example.com",
+      "age": 26,
+      "department": "设计部",
+      "position": "UI设计师",
+      "avatar": "https://api.dicebear.com/7.x/avataaars/svg?seed=wangwu",
+      "createdAt": "2024-01-20T10:45:00Z",
+      "isActive": false
+    },
+    {
+      "id": 4,
+      "name": "赵六",
+      "email": "zhaoliu@example.com",
+      "age": 30,
+      "department": "产品部",
+      "position": "产品经理",
+      "avatar": "https://api.dicebear.com/7.x/avataaars/svg?seed=zhaoliu",
+      "createdAt": "2024-01-05T14:20:00Z",
+      "isActive": true
+    }
+  ],
+  "products": [
+    {
+      "id": 101,
+      "name": "智能手机",
+      "category": "电子产品",
+      "price": 2999,
+      "currency": "CNY",
+      "description": "高性能智能手机，配备先进的摄像系统",
+      "image": "https://picsum.photos/300/300?random=101",
+      "stock": 150,
+      "rating": 4.5,
+      "reviews": 328,
+      "tags": ["智能", "高清摄像", "长续航"],
+      "specifications": {
+        "screen": "6.1英寸 OLED",
+        "storage": "128GB",
+        "camera": "48MP三摄",
+        "battery": "4000mAh"
+      },
+      "createdAt": "2024-01-01T00:00:00Z",
+      "updatedAt": "2024-01-25T12:30:00Z"
+    },
+    {
+      "id": 102,
+      "name": "无线耳机",
+      "category": "电子产品",
+      "price": 599,
+      "currency": "CNY",
+      "description": "主动降噪无线耳机，音质清晰",
+      "image": "https://picsum.photos/300/300?random=102",
+      "stock": 89,
+      "rating": 4.3,
+      "reviews": 156,
+      "tags": ["无线", "降噪", "高音质"],
+      "specifications": {
+        "battery": "30小时续航",
+        "connectivity": "蓝牙5.0",
+        "features": "主动降噪",
+        "weight": "250g"
+      },
+      "createdAt": "2024-01-03T00:00:00Z",
+      "updatedAt": "2024-01-22T16:45:00Z"
+    },
+    {
+      "id": 103,
+      "name": "笔记本电脑",
+      "category": "电子产品",
+      "price": 8999,
+      "currency": "CNY",
+      "description": "轻薄便携笔记本电脑，适合办公和学习",
+      "image": "https://picsum.photos/300/300?random=103",
+      "stock": 45,
+      "rating": 4.7,
+      "reviews": 89,
+      "tags": ["轻薄", "高性能", "长续航"],
+      "specifications": {
+        "processor": "Intel i7",
+        "memory": "16GB RAM",
+        "storage": "512GB SSD",
+        "display": "14英寸 2K"
+      },
+      "createdAt": "2024-01-08T00:00:00Z",
+      "updatedAt": "2024-01-28T09:15:00Z"
+    }
+  ],
+  "orders": [
+    {
+      "id": "ORD-2024-001",
+      "userId": 1,
+      "status": "completed",
+      "items": [
+        {
+          "productId": 101,
+          "quantity": 1,
+          "price": 2999
+        },
+        {
+          "productId": 102,
+          "quantity": 2,
+          "price": 599
+        }
+      ],
+      "totalAmount": 4197,
+      "currency": "CNY",
+      "shippingAddress": {
+        "street": "中关村大街1号",
+        "city": "北京",
+        "province": "北京市",
+        "postalCode": "100080",
+        "country": "中国"
+      },
+      "paymentMethod": "支付宝",
+      "orderDate": "2024-01-25T14:30:00Z",
+      "deliveryDate": "2024-01-28T10:00:00Z"
+    },
+    {
+      "id": "ORD-2024-002",
+      "userId": 2,
+      "status": "processing",
+      "items": [
+        {
+          "productId": 103,
+          "quantity": 1,
+          "price": 8999
+        }
+      ],
+      "totalAmount": 8999,
+      "currency": "CNY",
+      "shippingAddress": {
+        "street": "淮海中路999号",
+        "city": "上海",
+        "province": "上海市",
+        "postalCode": "200020",
+        "country": "中国"
+      },
+      "paymentMethod": "微信支付",
+      "orderDate": "2024-01-26T16:45:00Z",
+      "estimatedDelivery": "2024-01-30T12:00:00Z"
+    }
+  ],
+  "categories": [
+    {
+      "id": 1,
+      "name": "电子产品",
+      "description": "各类电子设备和数码产品",
+      "icon": "📱",
+      "productCount": 3,
+      "isActive": true
+    },
+    {
+      "id": 2,
+      "name": "服装配饰",
+      "description": "时尚服装和配饰用品",
+      "icon": "👕",
+      "productCount": 0,
+      "isActive": true
+    },
+    {
+      "id": 3,
+      "name": "家居用品",
+      "description": "家庭生活用品和装饰",
+      "icon": "🏠",
+      "productCount": 0,
+      "isActive": false
+    }
+  ],
+  "statistics": {
+    "totalUsers": 4,
+    "totalProducts": 3,
+    "totalOrders": 2,
+    "totalRevenue": 13196,
+    "averageOrderValue": 6598,
+    "topSellingProduct": {
+      "id": 101,
+      "name": "智能手机",
+      "salesCount": 1
+    },
+    "recentActivity": [
+      {
+        "type": "order",
+        "message": "新订单 ORD-2024-002",
+        "timestamp": "2024-01-26T16:45:00Z"
+      },
+      {
+        "type": "user",
+        "message": "用户王五状态更新",
+        "timestamp": "2024-01-25T18:20:00Z"
+      },
+      {
+        "type": "product",
+        "message": "产品笔记本电脑信息更新",
+        "timestamp": "2024-01-28T09:15:00Z"
+      }
+    ]
+  },
+  "meta": {
+    "version": "1.0.0",
+    "lastUpdated": "2024-01-28T12:00:00Z",
+    "dataSource": "JSON格式化大师插件演示数据",
+    "description": "这是一个包含用户、产品、订单等信息的完整演示数据集，适用于测试API功能"
+  }
+}

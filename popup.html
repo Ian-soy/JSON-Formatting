@@ -27,6 +27,7 @@
       <button id="download-btn" class="btn secondary" title="下载JSON文件"><span class="icon-container"></span></button>
       <button id="convert-btn" class="btn secondary" title="格式转换"><span class="icon-container"></span></button>
       <button id="share-btn" class="btn secondary" title="分享JSON"><span class="icon-container"></span></button>
+      <button id="api-btn" class="btn secondary" title="转换为API"><span class="icon-container"></span></button>
 
     </div>
     
@@ -147,6 +148,82 @@
       </div>
     </div>
     
+    <!-- API服务模态框 -->
+    <div id="api-modal" class="modal">
+      <div class="modal-content api-modal-content">
+        <span class="close-btn">&times;</span>
+        <h2>🚀 JSON转API服务</h2>
+        
+        <!-- 模态框内部提示区域 -->
+        <div id="api-modal-message" class="modal-message" style="display: none;"></div>
+        
+        <!-- 服务器状态 -->
+        <div class="api-server-status">
+          <div class="status-indicator">
+            <span class="status-dot" id="api-status-dot"></span>
+            <span class="status-text" id="api-status-text">服务器未启动</span>
+          </div>
+          <button id="api-server-toggle" class="btn primary">启动API服务</button>
+        </div>
+        
+        <!-- API配置 -->
+        <div class="api-config-section">
+          <h3>📝 API配置</h3>
+          <div class="config-form">
+            <div class="form-group">
+              <label for="api-path-input">API路径：</label>
+              <input type="text" id="api-path-input" placeholder="/api/data" value="">
+              <small class="form-help">自定义API访问路径，留空将自动生成</small>
+            </div>
+            <div class="form-group">
+              <label for="api-description-input">描述：</label>
+              <input type="text" id="api-description-input" placeholder="API描述" value="">
+            </div>
+          </div>
+          <button id="create-api-btn" class="btn primary">🔧 创建API端点</button>
+        </div>
+        
+        <!-- API端点列表 -->
+        <div class="api-endpoints-section" id="api-endpoints-section" style="display: none;">
+          <h3>🌐 API端点列表</h3>
+          <div class="endpoints-list" id="endpoints-list">
+            <!-- 动态生成的端点列表 -->
+          </div>
+        </div>
+        
+        <!-- 使用示例 -->
+        <div class="api-examples-section" id="api-examples-section" style="display: none;">
+          <h3>💡 使用示例</h3>
+          <div class="example-tabs">
+            <button class="tab-btn active" data-tab="javascript">JavaScript</button>
+            <button class="tab-btn" data-tab="vue">Vue.js</button>
+            <button class="tab-btn" data-tab="react">React</button>
+          </div>
+          <div class="example-content">
+            <pre id="example-code"><code></code></pre>
+            <button class="copy-example-btn btn secondary">📋 复制代码</button>
+          </div>
+        </div>
+        
+        <div class="api-help">
+          <h4>🎯 功能特点：</h4>
+          <ul>
+            <li>🚀 <strong>一键转换</strong>：将JSON数据快速转换为可访问的API端点</li>
+            <li>🌐 <strong>本地服务</strong>：基于浏览器原生能力，无需额外服务器</li>
+            <li>⚡ <strong>即时可用</strong>：创建后立即可在Vue、React项目中使用</li>
+            <li>🔧 <strong>CORS支持</strong>：自动处理跨域请求，便于前端开发</li>
+            <li>📝 <strong>代码示例</strong>：提供多种框架的使用示例代码</li>
+          </ul>
+          <div class="api-tips">
+            <p><strong>💡 使用建议：</strong></p>
+            <p>• 适用于前端开发阶段的数据模拟</p>
+            <p>• 可快速验证API接口设计</p>
+            <p>• 支持多种HTTP方法和自定义响应</p>
+          </div>
+        </div>
+      </div>
+    </div>
+    
     <!-- 保存模态框 -->
     <div id="save-modal" class="modal">
       <div class="modal-content">
@@ -226,6 +303,7 @@
   <script src="src/js/data-manager.js"></script>
   <script src="src/js/settings-manager.js"></script>
   <script src="src/js/history-manager.js"></script>
+  <script src="src/js/api-server.js"></script>
   
   <!-- 主应用脚本 -->
   <script src="src/js/popup.js"></script>

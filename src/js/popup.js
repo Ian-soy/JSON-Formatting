@@ -1,6 +1,7 @@
 // 全局变量
 let currentActiveHistoryItem = null;
 let historyManager = null;
+let apiServerManager = null; // API服务器管理器
 let isEmptyStateDisplayed = false; // 标记是否显示空状态
 let hasOpenedToday = false; // 标记今天是否已经打开过插件
 let autoSaveEnabled = true; // 是否启用自动保存
@@ -13,7 +14,8 @@ const TOOLBAR_BUTTONS = [
   { id: 'copy-btn', title: '复制到剪贴板' },
   { id: 'download-btn', title: '下载JSON文件' },
   { id: 'convert-btn', title: '格式转换' },
-  { id: 'share-btn', title: '分享JSON' }
+  { id: 'share-btn', title: '分享JSON' },
+  { id: 'api-btn', title: '转换为API' }
 ];
 
 // DOM元素
@@ -61,6 +63,29 @@ async function initializeModules() {
     // 初始化历史数据管理器
     historyManager = new HistoryManager(dataManager);
     await historyManager.initialize();
+    
+    // 初始化API服务器管理器
+    try {
+      // 等待一下确保api-server.js已经加载完成
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      if (window.apiServerManager) {
+        apiServerManager = window.apiServerManager;
+        await apiServerManager.initialize();
+        console.log('API服务器管理器初始化成功');
+      } else {
+        // 如果全局实例不存在，尝试手动创建
+        if (typeof ApiServerManager !== 'undefined') {
+          apiServerManager = new ApiServerManager();
+          await apiServerManager.initialize();
+          console.log('手动创建API服务器管理器成功');
+        } else {
+          console.warn('API服务器管理器类未找到，API功能将不可用');
+        }
+      }
+    } catch (error) {
+      console.error('API服务器管理器初始化失败:', error);
+    }
     
     // 等待UI完全初始化后再加载数据
     setTimeout(async () => {
@@ -327,6 +352,7 @@ function initializeIcons() {
   document.querySelector('#download-btn .icon-container').innerHTML = IconManager.getIcon('download');
   document.querySelector('#convert-btn .icon-container').innerHTML = IconManager.getIcon('convert');
   document.querySelector('#share-btn .icon-container').innerHTML = IconManager.getIcon('share');
+  document.querySelector('#api-btn .icon-container').innerHTML = IconManager.getIcon('api') || '🚀';
   
   // 新增按钮图标
   const settingsBtn = document.querySelector('#settings-btn .icon-container');
@@ -362,6 +388,7 @@ function setupEventListeners() {
   document.getElementById('download-btn').addEventListener('click', downloadJSON);
   document.getElementById('convert-btn').addEventListener('click', showConvertModal);
   document.getElementById('share-btn').addEventListener('click', showShareModal);
+  document.getElementById('api-btn').addEventListener('click', showApiModal);
 
   // 新增功能按钮
   document.getElementById('settings-btn').addEventListener('click', () => settingsManager.toggleSettings());
@@ -2270,5 +2297,378 @@ async function saveCurrentData() {
     console.error('保存数据失败:', error);
     showSaveError(titleInput, errorElement, '保存失败，请重试');
     updateStatus('保存失败，请重试', 'error');
+  }
+}
+
+// ==== API服务功能函数 ====
+
+// 显示API模态框
+function showApiModal() {
+  // 检查数据有效性
+  const dataStatus = checkJsonDataStatus();
+  if (!dataStatus.hasData || !dataStatus.isValid) {
+    updateStatus(dataStatus.message, dataStatus.isEmpty ? 'warning' : 'error');
+    return;
+  }
+  
+  // 更新服务器状态显示
+  updateApiServerStatus();
+  
+  // 显示模态框
+  document.getElementById('api-modal').style.display = 'block';
+  
+  // 自动填充API路径建议
+  const input = document.getElementById('json-input');
+  try {
+    if (apiServerManager) {
+      const jsonData = JSON.parse(input.value.trim());
+      const suggestedPath = apiServerManager.generateApiPath(jsonData);
+      document.getElementById('api-path-input').value = suggestedPath;
+    } else {
+      document.getElementById('api-path-input').value = '/api/data';
+    }
+  } catch (error) {
+    console.warn('无法解析JSON数据生成路径建议:', error);
+    document.getElementById('api-path-input').value = '/api/data';
+  }
+}
+
+// 更新API服务器状态显示
+function updateApiServerStatus() {
+  if (!apiServerManager) {
+    console.warn('API服务器管理器未初始化');
+    return;
+  }
+  
+  const status = apiServerManager.getServerStatus();
+  const statusDot = document.getElementById('api-status-dot');
+  const statusText = document.getElementById('api-status-text');
+  const toggleBtn = document.getElementById('api-server-toggle');
+  
+  if (statusDot && statusText && toggleBtn) {
+    if (status.isRunning) {
+      statusDot.className = 'status-dot running';
+      statusText.textContent = `服务器运行中 (${status.url})`;
+      toggleBtn.textContent = '停止服务';
+      toggleBtn.className = 'btn danger';
+    } else {
+      statusDot.className = 'status-dot stopped';
+      statusText.textContent = '服务器未启动';
+      toggleBtn.textContent = '启动API服务';
+      toggleBtn.className = 'btn primary';
+    }
+  }
+  
+  // 更新端点列表显示
+  updateApiEndpointsList();
+}
+
+// 更新API端点列表
+function updateApiEndpointsList() {
+  if (!apiServerManager) {
+    console.warn('API服务器管理器未初始化');
+    return;
+  }
+  
+  const endpoints = apiServerManager.getEndpointList();
+  const endpointsSection = document.getElementById('api-endpoints-section');
+  const endpointsList = document.getElementById('endpoints-list');
+  
+  if (endpoints.length === 0) {
+    endpointsSection.style.display = 'none';
+    return;
+  }
+  
+  endpointsSection.style.display = 'block';
+  
+  const endpointsHtml = endpoints.map(endpoint => `
+    <div class="endpoint-item">
+      <div class="endpoint-info">
+        <div class="endpoint-path">
+          <span class="method-badge ${endpoint.method.toLowerCase()}">${endpoint.method}</span>
+          <code class="endpoint-url">${endpoint.url}</code>
+        </div>
+        <div class="endpoint-description">${endpoint.description}</div>
+        <div class="endpoint-actions">
+          <button class="btn secondary small copy-url-btn" data-url="${endpoint.url}">📋 复制URL</button>
+          <button class="btn secondary small test-api-btn" data-url="${endpoint.url}">🧪 测试</button>
+          <button class="btn secondary small show-examples-btn" data-url="${endpoint.url}">💡 示例</button>
+        </div>
+      </div>
+    </div>
+  `).join('');
+  
+  endpointsList.innerHTML = endpointsHtml;
+  
+  // 添加按钮事件监听器
+  endpointsList.querySelectorAll('.copy-url-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const url = e.target.dataset.url;
+      copyApiUrl(url);
+    });
+  });
+  
+  endpointsList.querySelectorAll('.test-api-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const url = e.target.dataset.url;
+      testApiEndpoint(url);
+    });
+  });
+  
+  endpointsList.querySelectorAll('.show-examples-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const url = e.target.dataset.url;
+      showApiExamples(url);
+    });
+  });
+}
+
+// 复制API URL
+async function copyApiUrl(url) {
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(url);
+      showApiModalMessage('✅ API地址已复制到剪贴板', 'success', 2000);
+    } else {
+      // 降级方案
+      const tempInput = document.createElement('input');
+      tempInput.value = url;
+      document.body.appendChild(tempInput);
+      tempInput.select();
+      document.execCommand('copy');
+      document.body.removeChild(tempInput);
+      showApiModalMessage('✅ API地址已复制到剪贴板', 'success', 2000);
+    }
+  } catch (error) {
+    console.error('复制API地址失败:', error);
+    showApiModalMessage('❌ 复制失败，请手动复制', 'error', 3000);
+  }
+}
+
+// 测试API端点
+async function testApiEndpoint(url) {
+  try {
+    showApiModalMessage('🧪 正在测试API端点...', 'info');
+    
+    const response = await fetch(url);
+    const data = await response.json();
+    
+    if (response.ok) {
+      showApiModalMessage(`✅ API测试成功 (状态码: ${response.status})`, 'success', 3000);
+      console.log('API测试响应:', data);
+    } else {
+      showApiModalMessage(`❌ API测试失败 (状态码: ${response.status})`, 'error', 3000);
+    }
+  } catch (error) {
+    console.error('API测试失败:', error);
+    showApiModalMessage('❌ API测试失败: ' + error.message, 'error', 3000);
+  }
+}
+
+// 显示API使用示例
+function showApiExamples(url, implementations = null) {
+  const examplesSection = document.getElementById('api-examples-section');
+  
+  examplesSection.style.display = 'block';
+  
+  // 更新标签页以显示实现方案
+  const tabsContainer = document.querySelector('.example-tabs');
+  if (implementations) {
+    tabsContainer.innerHTML = `
+      <button class="tab-btn active" data-tab="usage">前端使用</button>
+      <button class="tab-btn" data-tab="express">Express.js</button>
+      <button class="tab-btn" data-tab="nodejs">Node.js</button>
+      <button class="tab-btn" data-tab="jsonserver">JSON Server</button>
+      <button class="tab-btn" data-tab="msw">MSW</button>
+      <button class="tab-btn" data-tab="vercel">Vercel</button>
+    `;
+  } else {
+    tabsContainer.innerHTML = `
+      <button class="tab-btn active" data-tab="javascript">JavaScript</button>
+      <button class="tab-btn" data-tab="vue">Vue.js</button>
+      <button class="tab-btn" data-tab="react">React</button>
+    `;
+  }
+  
+  // 准备示例内容
+  let examples;
+  if (implementations) {
+    examples = {
+      usage: apiServerManager ? apiServerManager.generateApiExamples(url).javascript : '// API服务器管理器未初始化',
+      express: implementations.express,
+      nodejs: implementations.nodejs,
+      jsonserver: implementations.jsonServer,
+      msw: implementations.msw,
+      vercel: implementations.vercel
+    };
+  } else {
+    examples = apiServerManager ? apiServerManager.generateApiExamples(url) : {
+      javascript: '// API服务器管理器未初始化',
+      vue: '// API服务器管理器未初始化',
+      react: '// API服务器管理器未初始化'
+    };
+  }
+  
+  // 默认显示第一个标签
+  const firstTab = implementations ? 'usage' : 'javascript';
+  showExampleCode(firstTab, examples);
+  
+  // 添加标签页切换事件
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const tab = e.target.dataset.tab;
+      
+      // 更新标签页状态
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      e.target.classList.add('active');
+      
+      // 显示对应示例
+      showExampleCode(tab, examples);
+    });
+  });
+  
+  // 添加复制示例代码事件
+  const copyBtn = document.querySelector('.copy-example-btn');
+  if (copyBtn) {
+    copyBtn.replaceWith(copyBtn.cloneNode(true)); // 移除旧的事件监听器
+    document.querySelector('.copy-example-btn').addEventListener('click', () => {
+      copyExampleCode();
+    });
+  }
+}
+
+// 显示示例代码
+function showExampleCode(type, examples) {
+  const exampleCode = document.getElementById('example-code');
+  const code = examples[type] || examples.javascript;
+  exampleCode.textContent = code;
+}
+
+// 复制示例代码
+async function copyExampleCode() {
+  const exampleCode = document.getElementById('example-code');
+  const code = exampleCode.textContent;
+  
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(code);
+      showApiModalMessage('✅ 示例代码已复制到剪贴板', 'success', 2000);
+    } else {
+      // 降级方案
+      const tempTextarea = document.createElement('textarea');
+      tempTextarea.value = code;
+      document.body.appendChild(tempTextarea);
+      tempTextarea.select();
+      document.execCommand('copy');
+      document.body.removeChild(tempTextarea);
+      showApiModalMessage('✅ 示例代码已复制到剪贴板', 'success', 2000);
+    }
+  } catch (error) {
+    console.error('复制示例代码失败:', error);
+    showApiModalMessage('❌ 复制失败，请手动复制', 'error', 3000);
+  }
+}
+
+// 显示API模态框消息
+function showApiModalMessage(message, type = 'info', duration = 3000) {
+  showModalMessage('api-modal', message, type, duration);
+}
+
+// 初始化API相关事件监听器
+document.addEventListener('DOMContentLoaded', () => {
+  // API服务器切换按钮
+  document.getElementById('api-server-toggle').addEventListener('click', toggleApiServer);
+  
+  // 创建API端点按钮
+  document.getElementById('create-api-btn').addEventListener('click', createApiEndpoint);
+});
+
+// 切换API服务器状态
+async function toggleApiServer() {
+  if (!apiServerManager) {
+    showApiModalMessage('❌ API服务器管理器未初始化', 'error', 3000);
+    return;
+  }
+  
+  const status = apiServerManager.getServerStatus();
+  
+  try {
+    if (status.isRunning) {
+      // 停止服务器
+      showApiModalMessage('正在停止API服务器...', 'info');
+      const result = await apiServerManager.stopServer();
+      
+      if (result.success) {
+        showApiModalMessage('✅ API服务器已停止', 'success', 2000);
+        updateApiServerStatus();
+      } else {
+        showApiModalMessage('❌ 停止服务器失败: ' + result.error, 'error', 3000);
+      }
+    } else {
+      // 启动服务器
+      showApiModalMessage('正在启动API服务器...', 'info');
+      const result = await apiServerManager.startServer();
+      
+      if (result.success) {
+        showApiModalMessage('✅ API服务器启动成功', 'success', 2000);
+        updateApiServerStatus();
+      } else {
+        showApiModalMessage('❌ 启动服务器失败: ' + result.error, 'error', 3000);
+      }
+    }
+  } catch (error) {
+    console.error('切换API服务器状态失败:', error);
+    showApiModalMessage('❌ 操作失败: ' + error.message, 'error', 3000);
+  }
+}
+
+// 创建API端点
+async function createApiEndpoint() {
+  if (!apiServerManager) {
+    showApiModalMessage('❌ API服务器管理器未初始化', 'error', 3000);
+    return;
+  }
+  
+  const input = document.getElementById('json-input');
+  const pathInput = document.getElementById('api-path-input');
+  const descriptionInput = document.getElementById('api-description-input');
+  
+  try {
+    const jsonData = input.value.trim();
+    const customPath = pathInput.value.trim();
+    const description = descriptionInput.value.trim();
+    
+    // 验证JSON数据
+    if (!JsonUtils.isValid(jsonData)) {
+      showApiModalMessage('❌ 无效的JSON数据，无法创建API', 'error', 3000);
+      return;
+    }
+    
+    showApiModalMessage('🔧 正在生成API实现方案...', 'info');
+    
+    // 创建API端点
+    const result = await apiServerManager.createApiFromCurrentJson(jsonData, customPath);
+    
+    if (result.success) {
+      showApiModalMessage(`✅ ${result.message}`, 'success', 3000);
+      
+      // 更新UI
+      updateApiServerStatus();
+      
+      // 显示API实现方案和使用示例
+      setTimeout(() => {
+        showApiExamples(result.apiUrl, result.implementations);
+      }, 1000);
+      
+      // 清空输入框
+      pathInput.value = '';
+      descriptionInput.value = '';
+      
+    } else {
+      showApiModalMessage('❌ 创建API失败: ' + result.error, 'error', 3000);
+    }
+  } catch (error) {
+    console.error('创建API端点失败:', error);
+    showApiModalMessage('❌ 创建API失败: ' + error.message, 'error', 3000);
   }
 }

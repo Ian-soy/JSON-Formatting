@@ -31,6 +31,14 @@
 - 在线分享
 - 可配置设置
 
+### 🚀 **NEW** JSON转API服务
+- **一键转换** - 将JSON数据快速转换为API端点
+- **多种实现** - 提供Express.js、Node.js、JSON Server等实现方案
+- **代码生成** - 自动生成前端调用代码和后端实现代码
+- **智能路径** - 根据数据结构自动推荐API路径
+- **CORS支持** - 自动处理跨域请求配置
+- **即时可用** - 生成的代码可直接在Vue、React项目中使用
+
 ## 📦 安装方法
 
 1. 下载项目到本地
@@ -38,6 +46,98 @@
 3. 开启"开发者模式"
 4. 点击"加载已解压的扩展程序"
 5. 选择项目文件夹
+
+## 🎯 JSON转API服务使用示例
+
+### 快速开始
+1. **输入JSON数据**
+   ```json
+   {
+     "users": [
+       {"id": 1, "name": "张三", "email": "zhangsan@example.com"},
+       {"id": 2, "name": "李四", "email": "lisi@example.com"}
+     ]
+   }
+   ```
+
+2. **点击API按钮** 🚀 - 打开API服务面板
+
+3. **创建API端点** - 系统自动推荐路径 `/api/users`
+
+4. **获取实现代码** - 选择适合的后端实现方案
+
+### 前端使用示例
+
+#### Vue.js
+```vue
+<template>
+  <div v-for="user in users" :key="user.id">
+    {{ user.name }} - {{ user.email }}
+  </div>
+</template>
+
+<script>
+export default {
+  data() {
+    return { users: [] };
+  },
+  async mounted() {
+    const response = await fetch('http://localhost:3000/api/users');
+    this.users = await response.json();
+  }
+};
+</script>
+```
+
+#### React
+```jsx
+function UserList() {
+  const [users, setUsers] = useState([]);
+  
+  useEffect(() => {
+    fetch('http://localhost:3000/api/users')
+      .then(res => res.json())
+      .then(setUsers);
+  }, []);
+  
+  return (
+    <div>
+      {users.map(user => (
+        <div key={user.id}>{user.name} - {user.email}</div>
+      ))}
+    </div>
+  );
+}
+```
+
+### 后端实现方案
+
+#### Express.js (推荐)
+```javascript
+const express = require('express');
+const cors = require('cors');
+const app = express();
+
+app.use(cors());
+app.get('/api/users', (req, res) => {
+  res.json(yourJsonData);
+});
+
+app.listen(3000);
+```
+
+#### JSON Server (最简单)
+```bash
+# 安装
+npm install -g json-server
+
+# 创建 db.json 文件，粘贴生成的JSON数据
+
+# 启动服务
+json-server --watch db.json --port 3000 --cors
+```
+
+> 📖 **详细文档**: 查看 [API_SERVICE_GUIDE.md](./API_SERVICE_GUIDE.md) 获取完整使用指南
 
 ## 🛠️ 技术架构
 
