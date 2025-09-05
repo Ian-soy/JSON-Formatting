@@ -132,8 +132,8 @@ body {
 }
 
 #format-btn .icon-container svg {
-  width: 24px;
-  height: 24px;
+  width: 22px;
+  height: 22px;
 }
 
 /* 格式化按钮特殊样式 */
@@ -143,6 +143,9 @@ body {
   border-radius: 8px;
   font-weight: 500;
   border: none;
+  width: 36px;
+  height: 36px;
+  padding: 10px;
 }
 
 #format-btn:hover {
