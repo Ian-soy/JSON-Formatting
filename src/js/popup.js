@@ -283,6 +283,11 @@ function updateToolbarButtonsState() {
         updateStatus(status.message, status.isValid ? '' : 'warning');
       }
     }
+  } else {
+    // 如果数据有效且之前有错误状态，清除错误状态
+    if (currentErrorMessage) {
+      clearErrorStatus();
+    }
   }
 }
 
@@ -367,12 +372,6 @@ function setupEventListeners() {
     storageInfoBtn.addEventListener('click', showStorageQuickInfo);
     // 设置初始标题
     storageInfoBtn.title = '💾 存储情况\n点击查看详细的存储使用情况和管理选项';
-  }
-  
-  // 测试转义解析按钮
-  const testEscapedBtn = document.getElementById('test-escaped-parsing-btn');
-  if (testEscapedBtn) {
-    testEscapedBtn.addEventListener('click', testEscapedParsing);
   }
 
   // 输入框事件（使用防抖优化）
@@ -979,6 +978,9 @@ async function formatJSON() {
         }
         updateStatus(statusMessage, 'success');
         
+        // 清除错误状态（因为JSON已成功格式化）
+        clearErrorStatus();
+        
         // 自动保存格式化后的JSON
         autoSaveFormattedJson(result.result);
         
@@ -990,7 +992,7 @@ async function formatJSON() {
         // 格式化失败，进行详细的错误分析
         const errorAnalysis = JsonUtils.analyzeJsonErrors(jsonString);
         if (errorAnalysis.lineErrors && errorAnalysis.lineErrors.length > 0) {
-          showDetailedErrors(errorAnalysis.lineErrors);
+          showFirstErrorInStatus(errorAnalysis.lineErrors);
         } else {
           updateStatus(`格式化错误: ${result.error}`, 'error');
         }
@@ -1006,175 +1008,64 @@ async function formatJSON() {
   }
 }
 
-// 显示详细的错误信息
-function showDetailedErrors(lineErrors) {
-  // 创建错误详情模态框
-  const modal = document.createElement('div');
-  modal.className = 'modal';
-  modal.id = 'error-details-modal';
+// 显示第一个错误在状态栏
+function showFirstErrorInStatus(lineErrors) {
+  if (!lineErrors || lineErrors.length === 0) {
+    updateStatus('未知的JSON格式错误', 'error');
+    return;
+  }
   
   // 按行号排序错误
   lineErrors.sort((a, b) => a.line - b.line);
   
-  // 生成错误列表HTML
-  const errorsList = lineErrors.map(error => {
-    const errorIcon = error.type === 'error' ? '❌' : '⚠️';
-    const errorClass = error.type === 'error' ? 'error-item' : 'warning-item';
-    
-    return `
-      <div class="${errorClass}">
-        <div class="error-header">
-          <span class="error-icon">${errorIcon}</span>
-          <span class="error-location">第 ${error.line} 行，第 ${error.column} 列</span>
-          <span class="error-type">${error.type === 'error' ? '错误' : '警告'}</span>
-        </div>
-        <div class="error-message">${error.message}</div>
-        <div class="error-suggestion">💡 ${error.suggestion}</div>
-        <div class="error-char">问题字符: <code>${error.char}</code></div>
-      </div>
-    `;
-  }).join('');
+  // 取第一个错误
+  const firstError = lineErrors[0];
   
-  modal.innerHTML = `
-    <div class="modal-content error-details-content">
-      <span class="close-btn">&times;</span>
-      <h2>🔍 JSON格式错误详情</h2>
-      <div class="error-summary">
-        <p>发现 <strong>${lineErrors.length}</strong> 个问题，请根据以下提示进行修复：</p>
-      </div>
-      <div class="errors-list">
-        ${errorsList}
-      </div>
-      <div class="modal-actions">
-        <button class="btn primary" data-action="confirm">确定</button>
-        <button class="btn secondary" data-action="highlight">在编辑器中高亮</button>
-      </div>
-    </div>
-  `;
+  // 格式化错误消息 - 移除错误统计
+  const errorIcon = firstError.type === 'error' ? '❌' : '⚠️';
+  let statusMessage = `${errorIcon} 第${firstError.line}行第${firstError.column}列: ${firstError.message}`;
   
-  document.body.appendChild(modal);
-  modal.style.display = 'block';
-  
-  // 添加关闭事件
-  modal.querySelector('.close-btn').addEventListener('click', closeErrorDetailsModal);
-  modal.addEventListener('click', (e) => {
-    if (e.target === modal) {
-      closeErrorDetailsModal();
-    }
-  });
-  
-  // 添加按钮事件
-  const confirmBtn = modal.querySelector('[data-action="confirm"]');
-  const highlightBtn = modal.querySelector('[data-action="highlight"]');
-  
-  if (confirmBtn) {
-    confirmBtn.addEventListener('click', closeErrorDetailsModal);
+  // 添加建议
+  if (firstError.suggestion) {
+    statusMessage += ` - ${firstError.suggestion}`;
   }
   
-  if (highlightBtn) {
-    highlightBtn.addEventListener('click', highlightErrorsInEditor);
-  }
-  
-  // 更新状态栏显示错误数量
-  const errorCount = lineErrors.filter(e => e.type === 'error').length;
-  const warningCount = lineErrors.filter(e => e.type === 'warning').length;
-  let statusMessage = `发现 ${errorCount} 个错误`;
-  if (warningCount > 0) {
-    statusMessage += `，${warningCount} 个警告`;
-  }
-  statusMessage += '，请查看详细错误信息';
+  // 移除错误统计部分，只显示具体的错误信息
   updateStatus(statusMessage, 'error');
 }
 
-// 关闭错误详情模态框
-function closeErrorDetailsModal() {
-  const modal = document.getElementById('error-details-modal');
-  if (modal) {
-    modal.remove();
-  }
-}
-
-// 在编辑器中高亮错误
-function highlightErrorsInEditor() {
-  const modal = document.getElementById('error-details-modal');
-  if (!modal) return;
-  
-  const errorItems = modal.querySelectorAll('.error-item, .warning-item');
-  const input = document.getElementById('json-input');
-  const lines = input.value.split('\n');
-  
-  // 为每行添加错误标记
-  errorItems.forEach((item, index) => {
-    const locationText = item.querySelector('.error-location').textContent;
-    const lineMatch = locationText.match(/第 (\d+) 行/);
-    if (lineMatch) {
-      const lineNumber = parseInt(lineMatch[1]) - 1;
-      if (lineNumber >= 0 && lineNumber < lines.length) {
-        // 在行首添加错误标记
-        const errorIcon = item.querySelector('.error-icon').textContent;
-        const errorType = item.querySelector('.error-type').textContent;
-        lines[lineNumber] = `// ${errorIcon} ${errorType}: ${item.querySelector('.error-message').textContent} ← ${lines[lineNumber]}`;
-      }
-    }
-  });
-  
-  // 更新编辑器内容
-  input.value = lines.join('\n');
-  updateCharCount();
-  
-  // 关闭模态框
-  closeErrorDetailsModal();
-  
-  // 显示成功消息
-  updateStatus('已在编辑器中标记错误位置', 'success');
-}
 
 // 解析转义字符串
 function parseEscapedString() {
-  console.log('🔍 parseEscapedString 函数被调用');
-  
   const input = document.getElementById('json-input');
   const jsonString = input.value.trim();
   
-  console.log('📝 输入内容:', jsonString.substring(0, 100) + (jsonString.length > 100 ? '...' : ''));
-  
   // 如果为空，提示用户输入
   if (!jsonString) {
-    console.log('❌ 输入为空');
     updateStatus('请先输入要解析的转义字符串', 'warning');
     return;
   }
   
   try {
-    console.log('🔄 开始使用 JsonUtils.parseEscapedJson 解析...');
-    
     // 使用智能解析功能
     const result = JsonUtils.parseEscapedJson(jsonString);
     
-    console.log('📊 解析结果:', result);
-    
     if (result.success) {
-      console.log('✅ 解析成功，开始格式化...');
-      
       // 解析成功，确保格式化显示
       let parsedData;
       if (typeof result.result === 'string') {
         // 如果结果是字符串，尝试解析为对象
         try {
           parsedData = JSON.parse(result.result);
-          console.log('🔄 字符串结果已解析为对象');
         } catch (e) {
           parsedData = result.result;
-          console.log('⚠️ 字符串结果无法进一步解析，保持原样');
         }
       } else {
         parsedData = result.result;
-        console.log('📄 结果已经是对象格式');
       }
       
       // 始终格式化为缩进的JSON
       const formattedJson = JSON.stringify(parsedData, null, 2);
-      console.log('🎨 格式化完成，长度:', formattedJson.length);
       
       input.value = formattedJson;
       
@@ -1189,7 +1080,6 @@ function parseEscapedString() {
         statusMessage += ' (数据已经是有效JSON格式，已重新格式化)';
       }
       
-      console.log('📢 显示成功状态:', statusMessage);
       updateStatus(statusMessage, 'success');
       
       // 更新UI
@@ -1200,16 +1090,11 @@ function parseEscapedString() {
       // 确保行号更新
       setTimeout(() => {
         LineNumberManager.updateLineNumbersStatic();
-        console.log('📏 行号已更新');
       }, 10);
       
     } else {
-      console.log('❌ 解析失败，尝试备选方案...');
-      
       // 新增：尝试处理包含转义引号的JSON字符串
       if (JsonUtils.containsEscapedQuotes(jsonString)) {
-        console.log('🔄 检测到转义引号，尝试特殊处理...');
-        
         try {
           // 直接尝试解析包含转义引号的字符串
           const parsed = JSON.parse(jsonString);
@@ -1217,8 +1102,8 @@ function parseEscapedString() {
           input.value = formatted;
           jsonData = parsed;
           
-          console.log('✅ 转义引号字符串解析成功');
           updateStatus('✓ 转义引号字符串解析成功', 'success');
+          clearErrorStatus(); // 清除错误状态
           updateCharCount();
           updateToolbarButtonsState();
           updateEmptyStateOverlay();
@@ -1227,7 +1112,7 @@ function parseEscapedString() {
           }, 10);
           return;
         } catch (e) {
-          console.log('❌ 转义引号字符串解析失败:', e.message);
+          // 转义引号解析失败，继续后续处理
         }
       }
       
@@ -1236,8 +1121,6 @@ function parseEscapedString() {
       
       // 检查是否是已经格式化的JSON
       if (JsonUtils.isValid(jsonString)) {
-        console.log('🔄 输入是有效JSON，直接格式化...');
-        
         // 如果是有效JSON，直接格式化
         try {
           const parsed = JSON.parse(jsonString);
@@ -1245,8 +1128,8 @@ function parseEscapedString() {
           input.value = formatted;
           jsonData = parsed;
           
-          console.log('✅ JSON重新格式化成功');
           updateStatus('✓ JSON已重新格式化', 'success');
+          clearErrorStatus(); // 清除错误状态
           updateCharCount();
           updateToolbarButtonsState();
           updateEmptyStateOverlay();
@@ -1255,32 +1138,23 @@ function parseEscapedString() {
           }, 10);
           return;
         } catch (e) {
-          console.log('❌ JSON格式化失败:', e.message);
           errorMessage = 'JSON解析错误: ' + e.message;
         }
       } else if (JsonUtils.looksLikeJson(jsonString)) {
         // 看起来像JSON但格式错误，进行详细的错误分析
-        console.log('⚠️ 看起来像JSON但格式错误，开始详细错误分析...');
-        
         const errorAnalysis = JsonUtils.analyzeJsonErrors(jsonString);
         if (errorAnalysis.lineErrors && errorAnalysis.lineErrors.length > 0) {
-          console.log('🔍 发现具体错误，显示详细错误信息');
-          showDetailedErrors(errorAnalysis.lineErrors);
+          showFirstErrorInStatus(errorAnalysis.lineErrors);
           return;
         } else {
           errorMessage = 'JSON格式错误，请检查语法后再试';
-          console.log('⚠️ 无法确定具体错误位置');
         }
-      } else {
-        console.log('❌ 输入不像JSON格式');
       }
       
-      console.log('📢 显示错误状态:', errorMessage);
       updateStatus(errorMessage, 'error');
     }
     
   } catch (error) {
-    console.log('💥 函数执行异常:', error);
     updateStatus(`解析错误: ${error.message}`, 'error');
   }
 }
@@ -1304,6 +1178,9 @@ function minifyJSON() {
       jsonData = result.data;
       updateStatus('JSON压缩成功', 'success');
       
+      // 清除错误状态（因为JSON已成功压缩）
+      clearErrorStatus();
+      
       // 确保行号更新
       setTimeout(() => {
         LineNumberManager.updateLineNumbersStatic();
@@ -1312,7 +1189,7 @@ function minifyJSON() {
       // 压缩失败，进行详细的错误分析
       const errorAnalysis = JsonUtils.analyzeJsonErrors(jsonString);
       if (errorAnalysis.lineErrors && errorAnalysis.lineErrors.length > 0) {
-        showDetailedErrors(errorAnalysis.lineErrors);
+        showFirstErrorInStatus(errorAnalysis.lineErrors);
       } else {
         updateStatus(`压缩错误: ${result.error}`, 'error');
       }
@@ -1322,7 +1199,7 @@ function minifyJSON() {
     // 捕获到异常，进行详细的错误分析
     const errorAnalysis = JsonUtils.analyzeJsonErrors(jsonString);
     if (errorAnalysis.lineErrors && errorAnalysis.lineErrors.length > 0) {
-      showDetailedErrors(errorAnalysis.lineErrors);
+      showFirstErrorInStatus(errorAnalysis.lineErrors);
     } else {
       updateStatus(`压缩错误: ${error.message}`, 'error');
     }
@@ -2231,18 +2108,57 @@ async function clearAllStorageData() {
   }
 }
 
-// 更新状态消息（使用防抖）
+// 更新状态消息（使用防抖）- 增强版本支持持久错误消息
+let currentErrorMessage = null; // 保存当前错误消息
+let statusTimer = null; // 状态计时器
+
 const updateStatus = performanceOptimizer.debounce((message, type = '') => {
   const statusElement = document.getElementById('status-message');
   statusElement.textContent = message;
   statusElement.className = type;
   
-  // 3秒后清除状态
-  setTimeout(() => {
-    statusElement.textContent = '准备就绪';
-    statusElement.className = '';
-  }, 3000);
+  // 清除之前的计时器
+  if (statusTimer) {
+    clearTimeout(statusTimer);
+    statusTimer = null;
+  }
+  
+  // 如果是错误类型，保存错误消息，不自动清除
+  if (type === 'error') {
+    currentErrorMessage = message;
+    return;
+  }
+  
+  // 如果是成功消息且之前有错误，清除错误状态
+  if (type === 'success' && currentErrorMessage) {
+    currentErrorMessage = null;
+  }
+  
+  // 对于非错误消息，3秒后清除状态（但不覆盖错误消息）
+  if (type !== 'error') {
+    statusTimer = setTimeout(() => {
+      // 如果没有活跃的错误消息，重置为准备就绪
+      if (!currentErrorMessage) {
+        statusElement.textContent = '准备就绪';
+        statusElement.className = '';
+      } else {
+        // 如果有错误消息，恢复显示错误
+        statusElement.textContent = currentErrorMessage;
+        statusElement.className = 'error';
+      }
+      statusTimer = null;
+    }, 3000);
+  }
 }, 100);
+
+// 添加清除错误状态的函数
+function clearErrorStatus() {
+  currentErrorMessage = null;
+  const statusElement = document.getElementById('status-message');
+  if (statusElement.className === 'error') {
+    updateStatus('准备就绪', '');
+  }
+}
 
 // ==== 新增功能函数 ====
 
@@ -2356,35 +2272,3 @@ async function saveCurrentData() {
     updateStatus('保存失败，请重试', 'error');
   }
 }
-
-// 测试转义字符串解析功能
-function testEscapedParsing() {
-  console.log('🧪 测试转义字符串解析功能...');
-  
-  // 使用用户提供的实际字符串
-  const testString = '[{\"title\":\"终审阳性率（数量）\",\"indicatorType\":\"indicator\",\"indicator\":\"D0032\",\"value\":\"\",\"unit\":\"份\",\"img\":\"img/summary-icon-1@2x.3f60ff8f.png\"}]';
-  
-  const input = document.getElementById('json-input');
-  input.value = testString;
-  
-  console.log('📝 填入测试数据:', testString);
-  console.log('🔍 字符串特征:');
-  console.log('- 长度:', testString.length);
-  console.log('- 以 [ 开始:', testString.startsWith('['));
-  console.log('- 以 ] 结束:', testString.endsWith(']'));
-  console.log('- 包含转义引号:', testString.includes('\\"'));
-  
-  // 更新UI
-  updateCharCount();
-  updateToolbarButtonsState();
-  updateEmptyStateOverlay();
-  
-  // 立即调用解析功能
-  setTimeout(() => {
-    console.log('🚀 调用 parseEscapedString...');
-    parseEscapedString();
-  }, 100);
-}
-
-// 将测试函数暴露到全局作用域
-window.testEscapedParsing = testEscapedParsing;

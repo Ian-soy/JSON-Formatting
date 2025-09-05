@@ -402,7 +402,10 @@ class JsonUtils {
    * @returns {Object} 包含详细错误分析的对象
    */
   static analyzeJsonErrors(jsonString) {
+    console.log('🔍 analyzeJsonErrors 被调用, 输入长度:', jsonString ? jsonString.length : 0);
+    
     if (!jsonString || typeof jsonString !== 'string') {
+      console.log('❌ 输入不是有效字符串');
       return {
         success: false,
         error: '输入不是有效的字符串',
@@ -500,7 +503,48 @@ class JsonUtils {
       }
     }
 
-    // 检查未闭合的括号和引号
+    // 增强的缺少逗号检测：在行级别分析后进行多行上下文分析
+    console.log('🔍 开始多行上下文分析...');
+    for (let i = 0; i < lines.length - 1; i++) {
+      const currentLine = lines[i].trim();
+      const nextLine = lines[i + 1].trim();
+      
+      // 检查当前行是否是键值对，下一行是否也是键值对
+      const currentLineIsKeyValue = /^"[^"]+"\s*:\s*.+[^,]$/.test(currentLine);
+      const nextLineIsKeyValue = /^"[^"]+"\s*:/.test(nextLine);
+      
+      console.log(`🔍 第${i + 1}行: "${currentLine}" -> 键值对: ${currentLineIsKeyValue}`);
+      console.log(`🔍 第${i + 2}行: "${nextLine}" -> 键值对: ${nextLineIsKeyValue}`);
+      
+      if (currentLineIsKeyValue && nextLineIsKeyValue && 
+          !currentLine.endsWith(',') && 
+          !currentLine.endsWith('}') && 
+          !currentLine.endsWith(']')) {
+        
+        console.log('❗ 检测到潜在的缺少逗号情况');
+        
+        // 确保不是在字符串中
+        const colonIndex = currentLine.indexOf(':');
+        const afterColon = currentLine.substring(colonIndex + 1).trim();
+        
+        // 检查是否是简单值（数字、字符串、布尔值）
+        const isSimpleValue = /^(\d+|"[^"]*"|true|false|null)$/.test(afterColon);
+        
+        console.log(`🔍 冥号后值: "${afterColon}" -> 是简单值: ${isSimpleValue}`);
+        
+        if (isSimpleValue) {
+          console.log(`✅ 确认缺少逗号：第${i + 1}行`);
+          lineErrors.push({
+            line: i + 1,
+            column: currentLine.length + 1,
+            type: 'error',
+            message: '缺少逗号分隔符',
+            char: '',
+            suggestion: '在行末添加逗号 ","'
+          });
+        }
+      }
+    }
     if (braceStack.length > 0) {
       braceStack.forEach(brace => {
         lineErrors.push({
@@ -541,19 +585,25 @@ class JsonUtils {
     }
 
     // 尝试解析以获取更具体的错误信息
+    console.log('🔍 尝试解析JSON...');
     try {
       JSON.parse(jsonString);
+      console.log('✅ JSON解析成功，返回结果');
+      console.log('📊 最终的lineErrors:', lineErrors);
       return {
         success: true,
         lineErrors: lineErrors
       };
     } catch (parseError) {
+      console.log('❌ JSON解析失败:', parseError.message);
       // 分析解析错误，定位到具体位置
       const parseErrorInfo = this.analyzeParseError(parseError, jsonString, lines);
       if (parseErrorInfo) {
+        console.log('🔍 添加解析错误信息:', parseErrorInfo);
         lineErrors.push(parseErrorInfo);
       }
 
+      console.log('📊 最终的lineErrors:', lineErrors);
       return {
         success: false,
         error: parseError.message,
@@ -584,9 +634,40 @@ class JsonUtils {
       });
     }
 
-    // 检查缺少逗号
-    if (trimmedLine.endsWith('}') || trimmedLine.endsWith(']')) {
-      // 这里需要更复杂的上下文分析
+    // 检查缺少逗号的情况
+    // 模式：键值对后面紧跟另一个键值对，但没有逗号
+    const missingCommaPattern = /"[^"]+"\s*:\s*[^,}\]]*\s*"[^"]+"\s*:/;
+    if (missingCommaPattern.test(trimmedLine)) {
+      // 找到第一个值结束的位置
+      const match = trimmedLine.match(/"[^"]+"\s*:\s*([^"]*(?:"[^"]*"[^"]*)*?)\s*"[^"]+"\s*:/);
+      if (match) {
+        const beforeSecondKey = match[0].lastIndexOf('"', match[0].lastIndexOf(':') - 1);
+        errors.push({
+          line: lineNumber,
+          column: beforeSecondKey + 2,
+          type: 'error',
+          message: '缺少逗号分隔符',
+          char: '',
+          suggestion: '在值后面添加逗号 ","'
+        });
+      }
+    }
+
+    // 特殊情况：数字或布尔值后面直接跟键名
+    const numberKeyPattern = /(\d+|true|false|null)\s+"[^"]+"\s*:/;
+    if (numberKeyPattern.test(trimmedLine)) {
+      const match = trimmedLine.match(numberKeyPattern);
+      if (match) {
+        const valueEnd = match.index + match[1].length;
+        errors.push({
+          line: lineNumber,
+          column: valueEnd + 1,
+          type: 'error',
+          message: '缺少逗号分隔符',
+          char: '',
+          suggestion: '在值后面添加逗号 ","'
+        });
+      }
     }
 
     // 检查单引号
@@ -661,7 +742,22 @@ class JsonUtils {
       const tokenMatch = errorMessage.match(/Unexpected token (.+)/);
       const token = tokenMatch ? tokenMatch[1] : '未知字符';
       
-      if (token.includes("'")) {
+      // 特别处理缺少逗号的情况
+      if (token.includes('"') || token === '"') {
+        // 检查是否是缺少逗号导致的意外字符串
+        const beforeError = jsonString.substring(Math.max(0, position - 50), position);
+        const afterError = jsonString.substring(position, Math.min(jsonString.length, position + 50));
+        
+        // 检查前面是否有数字或字符串值，后面是否有键名
+        const valuePattern = /(\d+|"[^"]*"|true|false|null)\s*$/;
+        const keyPattern = /^\s*"[^"]*"\s*:/;
+        
+        if (valuePattern.test(beforeError) && keyPattern.test(afterError)) {
+          suggestion = '在前一个值后面添加逗号 ","';
+        } else {
+          suggestion = '检查是否缺少逗号分隔符';
+        }
+      } else if (token.includes("'")) {
         suggestion = '检查是否使用了单引号，JSON标准要求使用双引号';
       } else if (token.includes('}') || token.includes(']')) {
         suggestion = '检查是否有多余的闭合括号或缺少开始括号';
